@@ -180,3 +180,36 @@ def test_telemetry_record_with_protection_event():
     )
     assert rec.protection_event == ProtectionEvent.SCP
     assert rec.trip_flag is True
+
+
+# ---------------------------------------------------------------------------
+# thermal_shutdown_c
+# ---------------------------------------------------------------------------
+
+def test_efuse_profile_thermal_shutdown_c_default():
+    p = EFuseProfile(
+        efuse_family=EFuseFamily.HS_10A,
+        nominal_current_a=6.0, max_current_a=15.0, fuse_rating_a=10.0,
+        r_ds_on_ohm=0.025, r_thermal_kw=40.0, tau_thermal_s=15.0,
+    )
+    assert p.thermal_shutdown_c == 150.0
+
+
+def test_efuse_profile_thermal_shutdown_c_custom():
+    p = EFuseProfile(
+        efuse_family=EFuseFamily.HS_10A,
+        nominal_current_a=6.0, max_current_a=15.0, fuse_rating_a=10.0,
+        r_ds_on_ohm=0.025, r_thermal_kw=40.0, tau_thermal_s=15.0,
+        thermal_shutdown_c=175.0,
+    )
+    assert p.thermal_shutdown_c == 175.0
+
+
+def test_channel_meta_thermal_shutdown_c_default():
+    ch = ChannelMeta(channel_id="ch_001")
+    assert ch.thermal_shutdown_c == 150.0
+
+
+def test_channel_meta_thermal_shutdown_c_custom():
+    ch = ChannelMeta(channel_id="ch_001", thermal_shutdown_c=120.0)
+    assert ch.thermal_shutdown_c == 120.0

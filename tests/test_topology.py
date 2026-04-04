@@ -175,6 +175,15 @@ class TestBuildChannels:
         assert len(channels) == 1
         assert channels[0].zone_id == ""
 
+    def test_propagates_thermal_shutdown_c(self):
+        """build_channels should propagate thermal_shutdown_c from catalog."""
+        zones = [ZoneController(zone_id="z1", name="Test")]
+        specs = [{"channel_id": "ch_test", "zone_id": "z1", "efuse_family": "hs_10a", "load_name": "test"}]
+        channels = build_channels(zones, specs)
+        ch = channels[0]
+        profile = get_profile(EFuseFamily.HS_10A)
+        assert ch.thermal_shutdown_c == profile.thermal_shutdown_c
+
 
 # ---------------------------------------------------------------------------
 # Config loading with topology

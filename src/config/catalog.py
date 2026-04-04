@@ -197,6 +197,7 @@ def build_channels(
             "voltage_adc_bits": profile.voltage_adc_bits,
             "fit_threshold_a2s": profile.fit_threshold_a2s,
             "short_circuit_threshold_a": profile.short_circuit_threshold_a,
+            "thermal_shutdown_c": profile.thermal_shutdown_c,
             "load_type": profile.load_type,
         }
 

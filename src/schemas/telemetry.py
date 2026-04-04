@@ -173,6 +173,10 @@ class EFuseProfile(BaseModel):
         default=0.0,
         description="Instantaneous short-circuit trip (A).  0 = auto as 3× max_current_a",
     )
+    thermal_shutdown_c: float = Field(
+        default=150.0,
+        description="Junction temperature for thermal shutdown (°C). Typical: 150–175°C.",
+    )
 
     # --- Safety classification ---
     safety_level: SafetyLevel = Field(default=SafetyLevel.QM, description="ISO 26262 classification")
@@ -335,6 +339,7 @@ class ChannelMeta(BaseModel):
     # Protection behavior
     fit_threshold_a2s: float = Field(default=0.0, ge=0.0, description="F(i,t) energy threshold A²·s (0 = auto)")
     short_circuit_threshold_a: float = Field(default=0.0, ge=0.0, description="Instantaneous SCP trip (A) (0 = auto)")
+    thermal_shutdown_c: float = Field(default=150.0, ge=50.0, description="Junction temp for thermal shutdown (°C)")
     cooldown_s: float = Field(default=1.0, ge=0.0, description="Auto-retry delay after eFuse trip")
     max_retries: int = Field(default=3, ge=0, description="Max auto-retries before latch-off")
 

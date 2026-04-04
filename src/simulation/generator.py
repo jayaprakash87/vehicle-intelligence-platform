@@ -443,7 +443,27 @@ class TelemetryGenerator:
         temperature = self._rc_thermal(np.nan_to_num(current, nan=0.0), ch, interval_s)
         # Add small measurement noise
         temperature += self.rng.normal(0, 0.2, n)
-        temperature = np.clip(temperature, -40, 150)
+        temperature = np.clip(temperature, -40, ch.thermal_shutdown_c + 10)
+
+        # --- Thermal shutdown protection ---
+        # If junction temp exceeds the IC's thermal shutdown threshold,
+        # the IC turns off the channel until temperature drops below
+        # a hysteresis point (typ. 20°C below shutdown).
+        thermal_limit = ch.thermal_shutdown_c
+        thermal_hysteresis = 20.0  # typical IC hysteresis
+        thermally_off = False
+        for i in range(n):
+            if not thermally_off and temperature[i] >= thermal_limit:
+                thermally_off = True
+            elif thermally_off and temperature[i] < (thermal_limit - thermal_hysteresis):
+                thermally_off = False
+
+            if thermally_off:
+                current[i] = self.rng.normal(0.001, 0.0005)
+                state[i] = False
+                trip[i] = True
+                protection_event[i] = ProtectionEvent.THERMAL_SHUTDOWN.value
+                status[i] = DeviceStatus.FAULT.value
 
         # Update status for thermal warnings
         for fi in faults:

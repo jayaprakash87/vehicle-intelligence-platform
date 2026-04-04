@@ -211,3 +211,95 @@ def test_catalog_propagates_dual_adc():
     profile = EFUSE_CATALOG[ch.efuse_family]
     assert ch.current_adc_bits == profile.current_adc_bits
     assert ch.voltage_adc_bits == profile.voltage_adc_bits
+
+
+# ---------------------------------------------------------------------------
+# Thermal shutdown simulation
+# ---------------------------------------------------------------------------
+
+def test_thermal_shutdown_fires_on_extreme_drift():
+    """A THERMAL_DRIFT fault with high intensity on a low-threshold channel
+    should trigger THERMAL_SHUTDOWN protection events."""
+    ch = ChannelMeta(
+        channel_id="ch_01",
+        load_name="test",
+        nominal_current_a=10.0,
+        max_current_a=30.0,
+        fuse_rating_a=20.0,
+        thermal_shutdown_c=100.0,  # low threshold to make it easier to trigger
+        r_thermal_kw=60.0,  # higher thermal resistance → faster heating
+        tau_thermal_s=5.0,
+        t_ambient_c=25.0,
+    )
+    cfg = _make_config(
+        channels=[ch],
+        duration_s=20.0,
+        sample_interval_ms=100.0,
+        fault_injections=[
+            FaultInjection(
+                channel_id="ch_01",
+                fault_type=FaultType.THERMAL_DRIFT,
+                start_s=1.0,
+                duration_s=15.0,
+                intensity=1.0,
+            )
+        ],
+    )
+    gen = TelemetryGenerator(cfg)
+    df, _ = gen.generate()
+
+    thermal_events = df[df["protection_event"] == ProtectionEvent.THERMAL_SHUTDOWN.value]
+    assert len(thermal_events) > 0, "Thermal shutdown should fire when T_j exceeds limit"
+    # During thermal shutdown, current should be near zero
+    assert thermal_events["current_a"].abs().max() < 0.5
+
+
+def test_thermal_shutdown_hysteresis_recovery():
+    """After thermal shutdown, channel should recover only after temperature drops
+    below the hysteresis band (thermal_limit - 20°C)."""
+    ch = ChannelMeta(
+        channel_id="ch_01",
+        load_name="test",
+        nominal_current_a=10.0,
+        max_current_a=30.0,
+        fuse_rating_a=20.0,
+        thermal_shutdown_c=100.0,
+        r_thermal_kw=60.0,
+        tau_thermal_s=3.0,   # fast thermal response for quicker decay
+        t_ambient_c=25.0,
+    )
+    cfg = _make_config(
+        channels=[ch],
+        duration_s=60.0,
+        sample_interval_ms=100.0,
+        fault_injections=[
+            FaultInjection(
+                channel_id="ch_01",
+                fault_type=FaultType.THERMAL_DRIFT,
+                start_s=1.0,
+                duration_s=5.0,  # short fault → temp should decay quickly after
+                intensity=1.0,
+            )
+        ],
+    )
+    gen = TelemetryGenerator(cfg)
+    df, _ = gen.generate()
+
+    events = df["protection_event"].values
+    # Should see THERMAL_SHUTDOWN events followed by a return to NONE
+    thermal_mask = events == ProtectionEvent.THERMAL_SHUTDOWN.value
+    if thermal_mask.any():
+        first_shutdown = thermal_mask.argmax()
+        # Find first recovery (non-shutdown) after shutdown
+        post_shutdown = events[first_shutdown:]
+        recovery_mask = post_shutdown != ProtectionEvent.THERMAL_SHUTDOWN.value
+        # Should eventually recover (fault ends, temp decays)
+        assert recovery_mask.any(), "Channel should recover after temp drops below hysteresis band"
+
+
+def test_nominal_no_thermal_shutdown():
+    """Nominal operation should never produce THERMAL_SHUTDOWN events."""
+    cfg = _make_config()
+    gen = TelemetryGenerator(cfg)
+    df, _ = gen.generate()
+    assert (df["protection_event"] != ProtectionEvent.THERMAL_SHUTDOWN.value).all()

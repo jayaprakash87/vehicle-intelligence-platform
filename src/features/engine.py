@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from src.config.models import FeatureConfig
+from src.schemas.telemetry import ProtectionEvent
 from src.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -86,6 +87,22 @@ class FeatureEngine:
                 self._linear_slope, raw=True
             )
         ).fillna(0)
+
+        # --- Protection event features (when column is present) ---
+        if "protection_event" in df.columns:
+            pe = df["protection_event"]
+            none_val = ProtectionEvent.NONE.value
+            # Binary: any protection event active (1) or not (0)
+            pe_active = (pe != none_val).astype(int)
+            df["protection_event_rate"] = df.groupby("channel_id")["protection_event"].transform(
+                lambda s: (s != none_val).astype(int).rolling(w, min_periods=1).mean()
+            )
+            # Per-mechanism rolling counts
+            for event in (ProtectionEvent.SCP, ProtectionEvent.I2T, ProtectionEvent.LATCH_OFF, ProtectionEvent.THERMAL_SHUTDOWN):
+                col_name = f"{event.value}_count"
+                df[col_name] = df.groupby("channel_id")["protection_event"].transform(
+                    lambda s, ev=event.value: (s == ev).astype(int).rolling(w * 2, min_periods=1).sum()
+                )
 
         # Anomaly score placeholder (filled by model layer later)
         if "anomaly_score" not in df.columns:

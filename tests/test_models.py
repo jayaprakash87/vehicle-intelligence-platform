@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from src.config.models import FeatureConfig, ModelConfig
 from src.features.engine import FeatureEngine
 from src.models.anomaly import AnomalyDetector, RulesFaultClassifier
-from src.schemas.telemetry import FaultType
+from src.schemas.telemetry import FaultType, ProtectionEvent
 
 
 def _make_featured_df(n: int = 500) -> pd.DataFrame:
@@ -91,3 +91,154 @@ def test_rules_classifier_nominal():
     }
     fault, conf, causes = clf.classify(row)
     assert fault == FaultType.NONE
+
+
+# ---------------------------------------------------------------------------
+# Protection-event-aware classification
+# ---------------------------------------------------------------------------
+
+def test_classifier_latch_off_from_scp():
+    """Latch-off with preceding SCP trips should reference short-circuit."""
+    clf = RulesFaultClassifier()
+    row = {
+        "spike_score": 6.0,
+        "trip_flag": True,
+        "overload_flag": True,
+        "trip_frequency": 3,
+        "temperature_slope": 0.1,
+        "degradation_trend": 0.0,
+        "rolling_rms_current": 15.0,
+        "current_a": 0.001,
+        "voltage_v": 13.5,
+        "protection_event": ProtectionEvent.LATCH_OFF.value,
+        "scp_count": 3,
+        "i2t_count": 0,
+        "latch_off_count": 1,
+        "thermal_shutdown_count": 0,
+    }
+    fault, conf, causes = clf.classify(row)
+    assert fault == FaultType.OVERLOAD_SPIKE
+    assert conf >= 0.8
+    assert any("latched off" in c.lower() for c in causes)
+    assert any("scp" in c.lower() or "short-circuit" in c.lower() for c in causes)
+
+
+def test_classifier_latch_off_from_i2t():
+    """Latch-off with preceding I2t trips should reference sustained overload."""
+    clf = RulesFaultClassifier()
+    row = {
+        "spike_score": 5.0,
+        "trip_flag": True,
+        "overload_flag": True,
+        "trip_frequency": 3,
+        "temperature_slope": 0.1,
+        "degradation_trend": 0.0,
+        "rolling_rms_current": 12.0,
+        "current_a": 0.001,
+        "voltage_v": 13.5,
+        "protection_event": ProtectionEvent.LATCH_OFF.value,
+        "scp_count": 0,
+        "i2t_count": 3,
+        "latch_off_count": 1,
+        "thermal_shutdown_count": 0,
+    }
+    fault, conf, causes = clf.classify(row)
+    assert fault == FaultType.OVERLOAD_SPIKE
+    assert any("overload" in c.lower() or "i²t" in c.lower() for c in causes)
+
+
+def test_classifier_thermal_shutdown():
+    """Thermal shutdown event should classify as THERMAL_DRIFT."""
+    clf = RulesFaultClassifier()
+    row = {
+        "spike_score": 1.0,
+        "trip_flag": True,
+        "overload_flag": False,
+        "trip_frequency": 0,
+        "temperature_slope": 0.5,
+        "degradation_trend": 0.0,
+        "rolling_rms_current": 10.0,
+        "current_a": 0.001,
+        "voltage_v": 13.5,
+        "protection_event": ProtectionEvent.THERMAL_SHUTDOWN.value,
+        "scp_count": 0,
+        "i2t_count": 0,
+        "latch_off_count": 0,
+        "thermal_shutdown_count": 1,
+    }
+    fault, conf, causes = clf.classify(row)
+    assert fault == FaultType.THERMAL_DRIFT
+    assert conf >= 0.7
+    assert any("thermal" in c.lower() for c in causes)
+
+
+def test_classifier_scp_overload():
+    """SCP event with spike should give SCP-specific cause text."""
+    clf = RulesFaultClassifier()
+    row = {
+        "spike_score": 5.0,
+        "trip_flag": True,
+        "overload_flag": True,
+        "trip_frequency": 0,
+        "temperature_slope": 0.0,
+        "degradation_trend": 0.0,
+        "rolling_rms_current": 15.0,
+        "current_a": 18.0,
+        "voltage_v": 13.5,
+        "protection_event": ProtectionEvent.SCP.value,
+        "scp_count": 1,
+        "i2t_count": 0,
+        "latch_off_count": 0,
+        "thermal_shutdown_count": 0,
+    }
+    fault, conf, causes = clf.classify(row)
+    assert fault == FaultType.OVERLOAD_SPIKE
+    assert any("short-circuit" in c.lower() or "wiring" in c.lower() for c in causes)
+
+
+def test_classifier_i2t_overload():
+    """I2T event with spike should give I2T-specific cause text."""
+    clf = RulesFaultClassifier()
+    row = {
+        "spike_score": 5.0,
+        "trip_flag": True,
+        "overload_flag": True,
+        "trip_frequency": 0,
+        "temperature_slope": 0.0,
+        "degradation_trend": 0.0,
+        "rolling_rms_current": 15.0,
+        "current_a": 18.0,
+        "voltage_v": 13.5,
+        "protection_event": ProtectionEvent.I2T.value,
+        "scp_count": 0,
+        "i2t_count": 1,
+        "latch_off_count": 0,
+        "thermal_shutdown_count": 0,
+    }
+    fault, conf, causes = clf.classify(row)
+    assert fault == FaultType.OVERLOAD_SPIKE
+    assert any("i²t" in c.lower() or "energy" in c.lower() for c in causes)
+
+
+def test_classifier_intermittent_mixed_trips():
+    """Intermittent overload with mixed SCP+I2T should note both mechanisms."""
+    clf = RulesFaultClassifier()
+    row = {
+        "spike_score": 2.0,
+        "trip_flag": False,
+        "overload_flag": True,
+        "trip_frequency": 4,
+        "temperature_slope": 0.0,
+        "degradation_trend": 0.0,
+        "rolling_rms_current": 10.0,
+        "current_a": 12.0,
+        "voltage_v": 13.5,
+        "protection_event": ProtectionEvent.NONE.value,
+        "scp_count": 2,
+        "i2t_count": 1,
+        "latch_off_count": 0,
+        "thermal_shutdown_count": 0,
+    }
+    fault, conf, causes = clf.classify(row)
+    assert fault == FaultType.INTERMITTENT_OVERLOAD
+    assert any("mixed" in c.lower() or "scp" in c.lower() for c in causes)

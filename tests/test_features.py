@@ -51,3 +51,67 @@ def test_feature_values_reasonable():
 
     # Spike score should be low for nominal
     assert result["spike_score"].mean() < 2.0
+
+
+# ---------------------------------------------------------------------------
+# Protection event features
+# ---------------------------------------------------------------------------
+
+def test_protection_event_features_present():
+    """When protection_event column exists, event features should be added."""
+    from src.schemas.telemetry import ProtectionEvent
+    df = _make_telemetry(200)
+    rng = np.random.default_rng(99)
+    # Inject some SCP and I2T events
+    events = [ProtectionEvent.NONE.value] * 200
+    for i in range(50, 60):
+        events[i] = ProtectionEvent.SCP.value
+    for i in range(80, 90):
+        events[i] = ProtectionEvent.I2T.value
+    df["protection_event"] = events
+    engine = FeatureEngine(FeatureConfig(window_size=20, min_periods=5))
+    result = engine.compute(df)
+    for col in ("protection_event_rate", "scp_count", "i2t_count",
+                "latch_off_count", "thermal_shutdown_count"):
+        assert col in result.columns, f"Missing column: {col}"
+
+
+def test_protection_event_counts_nonzero():
+    """Rolling counts should reflect injected protection events."""
+    from src.schemas.telemetry import ProtectionEvent
+    df = _make_telemetry(200)
+    events = [ProtectionEvent.NONE.value] * 200
+    for i in range(50, 60):
+        events[i] = ProtectionEvent.SCP.value
+    df["protection_event"] = events
+    engine = FeatureEngine(FeatureConfig(window_size=20, min_periods=5))
+    result = engine.compute(df)
+    # After the SCP burst, scp_count should be > 0 somewhere
+    assert result["scp_count"].max() > 0
+    # i2t_count should remain 0
+    assert result["i2t_count"].max() == 0
+
+
+def test_protection_event_rate_range():
+    """protection_event_rate should be between 0 and 1."""
+    from src.schemas.telemetry import ProtectionEvent
+    df = _make_telemetry(200)
+    events = [ProtectionEvent.NONE.value] * 200
+    for i in range(100, 120):
+        events[i] = ProtectionEvent.THERMAL_SHUTDOWN.value
+    df["protection_event"] = events
+    engine = FeatureEngine(FeatureConfig(window_size=20, min_periods=5))
+    result = engine.compute(df)
+    assert result["protection_event_rate"].min() >= 0.0
+    assert result["protection_event_rate"].max() <= 1.0
+
+
+def test_no_protection_event_column_still_works():
+    """Feature engine should work without protection_event column (backward compat)."""
+    df = _make_telemetry(200)
+    assert "protection_event" not in df.columns
+    engine = FeatureEngine(FeatureConfig(window_size=20, min_periods=5))
+    result = engine.compute(df)
+    assert "rolling_rms_current" in result.columns
+    # Protection-event-derived features should be absent
+    assert "scp_count" not in result.columns

@@ -17,7 +17,7 @@ import pandas as pd
 from sklearn.ensemble import IsolationForest
 
 from src.config.models import ModelConfig
-from src.schemas.telemetry import FaultType
+from src.schemas.telemetry import FaultType, ProtectionEvent
 from src.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -158,6 +158,7 @@ class RulesFaultClassifier:
         """Classify a single feature-enriched row.
 
         Returns (fault_type, confidence, likely_causes).
+        Uses protection_event when available to sharpen root-cause determination.
         """
         r = row if isinstance(row, dict) else row.to_dict()
 
@@ -172,21 +173,53 @@ class RulesFaultClassifier:
         voltage = r.get("voltage_v", 0) or 0
         missing_rate = r.get("missing_rate", 0) or 0
 
+        # Protection event context (available when generator or CDD populates it)
+        pe = r.get("protection_event", ProtectionEvent.NONE.value)
+        scp_count = r.get("scp_count", 0) or 0
+        i2t_count = r.get("i2t_count", 0) or 0
+        latch_off_count = r.get("latch_off_count", 0) or 0
+        thermal_shutdown_count = r.get("thermal_shutdown_count", 0) or 0
+
         causes: list[str] = []
+
+        # --- Latch-off: max retries exhausted, channel locked ---
+        if pe == ProtectionEvent.LATCH_OFF.value or latch_off_count > 0:
+            causes.append("eFuse exhausted max auto-retry attempts — channel latched off")
+            if scp_count > i2t_count:
+                causes.append("Preceding SCP trips suggest wiring short-circuit")
+            elif i2t_count > 0:
+                causes.append("Preceding I²t trips suggest sustained overload")
+            return FaultType.OVERLOAD_SPIKE, min(0.8 + latch_off_count * 0.1, 1.0), causes
+
+        # --- Thermal shutdown ---
+        if pe == ProtectionEvent.THERMAL_SHUTDOWN.value or thermal_shutdown_count > 0:
+            causes.append("Junction temperature exceeded thermal shutdown limit")
+            if temp_slope > 0.2:
+                causes.append("Sustained temperature rise — check cooling or load current")
+            return FaultType.THERMAL_DRIFT, min(0.7 + thermal_shutdown_count * 0.1, 1.0), causes
 
         # Dropped packets — high missing data rate
         if missing_rate > 0.1:
             causes.append("High rate of missing signal samples indicates packet loss")
             return FaultType.DROPPED_PACKET, min(missing_rate / 0.4, 1.0), causes
 
-        # Overload spike — high spike + trip
+        # Overload spike — high spike + trip, refined by protection event type
         if spike > 4.0 and trip:
-            causes.append("Sudden high current draw exceeding fuse rating")
+            if pe == ProtectionEvent.SCP.value:
+                causes.append("Short-circuit protection fired — check wiring or connector")
+            elif pe == ProtectionEvent.I2T.value:
+                causes.append("I²t energy-integral trip — sustained overcurrent, not instantaneous")
+            else:
+                causes.append("Sudden high current draw exceeding fuse rating")
             return FaultType.OVERLOAD_SPIKE, min(spike / 6.0, 1.0), causes
 
         # Intermittent overload — moderate spike + repeating trips
         if trip_freq > 2 and overload:
             causes.append("Repeated transient overcurrent events")
+            if scp_count > 0 and i2t_count > 0:
+                causes.append("Mixed SCP and I²t trips — intermittent short with load stress")
+            elif scp_count > 0:
+                causes.append("Repeated SCP trips — loose connector or chafed harness")
             return FaultType.INTERMITTENT_OVERLOAD, min(trip_freq / 5.0, 1.0), causes
 
         # Voltage sag
