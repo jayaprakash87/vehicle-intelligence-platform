@@ -42,18 +42,42 @@ class TelemetryGenerator:
 
     def generate(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Return (telemetry_df, labels_df) for the full scenario."""
-        n_samples = int(self.cfg.duration_s / (self.cfg.sample_interval_ms / 1000))
         t0 = datetime.now(tz=timezone.utc)
-        timestamps = [t0 + timedelta(milliseconds=i * self.cfg.sample_interval_ms) for i in range(n_samples)]
-        interval_s = self.cfg.sample_interval_ms / 1000
 
-        # Shared bus voltage — all channels see the same battery rail
-        bus_voltage = self._generate_bus_voltage(n_samples, interval_s)
+        # Determine per-channel intervals (ms); fall back to global default
+        ch_intervals = {}
+        for ch in self.cfg.channels:
+            if ch.sample_interval_ms > 0:
+                ch_intervals[ch.channel_id] = ch.sample_interval_ms
+            else:
+                ch_intervals[ch.channel_id] = self.cfg.sample_interval_ms
+
+        # Bus voltage at the finest granularity across all channels
+        finest_ms = min(ch_intervals.values())
+        finest_s = finest_ms / 1000
+        n_finest = int(self.cfg.duration_s / finest_s)
+        bus_voltage_fine = self._generate_bus_voltage(n_finest, finest_s)
+        fine_times = np.arange(n_finest) * finest_s  # seconds from t0
 
         all_rows: list[dict] = []
         all_labels: list[dict] = []
 
         for ch in self.cfg.channels:
+            interval_ms = ch_intervals[ch.channel_id]
+            interval_s = interval_ms / 1000
+            n_samples = int(self.cfg.duration_s / interval_s)
+            timestamps = [t0 + timedelta(milliseconds=i * interval_ms) for i in range(n_samples)]
+
+            # Downsample bus voltage to this channel's rate
+            if interval_ms == finest_ms:
+                bus_voltage = bus_voltage_fine[:n_samples]
+            else:
+                step = max(int(interval_ms / finest_ms), 1)
+                bus_voltage = bus_voltage_fine[::step][:n_samples]
+                # Pad if rounding left us short
+                if len(bus_voltage) < n_samples:
+                    bus_voltage = np.pad(bus_voltage, (0, n_samples - len(bus_voltage)), mode="edge")
+
             ch_faults = [f for f in self.cfg.fault_injections if f.channel_id == ch.channel_id]
             rows, labels = self._generate_channel(timestamps, ch, ch_faults, bus_voltage, interval_s)
             all_rows.extend(rows)

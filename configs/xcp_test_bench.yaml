@@ -1,0 +1,96 @@
+# XCP Test Bench configuration
+# Simulates dual-raster XCP DAQ: 10ms fast (current/voltage) + 50ms slow (temperature)
+# Typical for prototype/test vehicles with calibration interface
+
+simulation:
+  scenario_id: xcp_dual_raster
+  name: "XCP Test Bench - Dual Raster"
+  description: "Test vehicle with XCP DAQ: fast (10ms) and slow (50ms) raster channels"
+  duration_s: 60.0
+  sample_interval_ms: 10.0  # fastest raster as default
+  seed: 42
+  channels:
+    # Fast raster channels (10ms) — current and voltage measurement
+    - channel_id: xcp_fast_01
+      load_name: headlamp_left
+      nominal_current_a: 6.0
+      max_current_a: 15.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 10.0
+      load_type: resistive
+      sample_interval_ms: 10.0
+      r_ds_on_ohm: 0.008
+      r_thermal_kw: 35.0
+      tau_thermal_s: 20.0
+    - channel_id: xcp_fast_02
+      load_name: wiper_motor
+      nominal_current_a: 4.0
+      max_current_a: 12.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 8.0
+      load_type: motor
+      sample_interval_ms: 10.0
+      r_ds_on_ohm: 0.010
+      r_thermal_kw: 30.0
+      tau_thermal_s: 15.0
+      inrush_factor: 5.0
+      inrush_duration_ms: 50.0
+
+    # Slow raster channels (50ms) — temperature and status signals
+    - channel_id: xcp_slow_01
+      load_name: rear_defroster
+      nominal_current_a: 12.0
+      max_current_a: 25.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 20.0
+      load_type: ptc
+      sample_interval_ms: 50.0
+      r_ds_on_ohm: 0.015
+      r_thermal_kw: 45.0
+      tau_thermal_s: 10.0
+    - channel_id: xcp_slow_02
+      load_name: seat_heater
+      nominal_current_a: 8.0
+      max_current_a: 18.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 15.0
+      load_type: resistive
+      sample_interval_ms: 50.0
+      r_ds_on_ohm: 0.010
+      r_thermal_kw: 40.0
+      tau_thermal_s: 15.0
+
+  fault_injections:
+    - channel_id: xcp_fast_01
+      fault_type: overload_spike
+      start_s: 15.0
+      duration_s: 3.0
+      intensity: 0.8
+    - channel_id: xcp_slow_01
+      fault_type: thermal_drift
+      start_s: 20.0
+      duration_s: 15.0
+      intensity: 0.6
+    - channel_id: xcp_fast_02
+      fault_type: intermittent_overload
+      start_s: 30.0
+      duration_s: 5.0
+      intensity: 0.7
+
+features:
+  window_duration_s: 5.0
+  min_duration_s: 1.0
+
+normalizer:
+  ffill_tolerance_s: 0.5
+  missing_rate_window_s: 5.0
+  resample_interval_ms: 10.0  # align all channels to 10ms for feature computation
+
+model:
+  anomaly_contamination: auto
+  anomaly_n_estimators: 100
+  model_dir: artifacts/models
+
+storage:
+  output_dir: output
+  format: parquet

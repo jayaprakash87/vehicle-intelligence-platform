@@ -34,12 +34,27 @@ class SimulationConfig(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Feature config
+# Feature config — time-based (auto-computes sample counts from interval)
 # ---------------------------------------------------------------------------
 
 class FeatureConfig(BaseModel):
-    window_size: int = 50
-    min_periods: int = 10
+    window_duration_s: float = Field(default=5.0, description="Rolling window duration in seconds")
+    min_duration_s: float = Field(default=1.0, description="Minimum data duration before features are valid")
+    # Legacy sample-count fields — used if > 0, else auto-computed from duration
+    window_size: int = Field(default=0, description="Override: fixed window in samples (0=auto from duration)")
+    min_periods: int = Field(default=0, description="Override: fixed min_periods (0=auto from duration)")
+
+    def resolve(self, sample_interval_s: float) -> tuple[int, int]:
+        """Return (window_size, min_periods) for a given sample interval."""
+        if self.window_size > 0:
+            w = self.window_size
+        else:
+            w = max(int(self.window_duration_s / sample_interval_s), 2)
+        if self.min_periods > 0:
+            mp = self.min_periods
+        else:
+            mp = max(int(self.min_duration_s / sample_interval_s), 1)
+        return w, min(mp, w)
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +92,25 @@ class EdgeConfig(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Normalizer config
+# ---------------------------------------------------------------------------
+
+class NormalizerConfig(BaseModel):
+    ffill_tolerance_s: float = Field(
+        default=0.5,
+        description="Max forward-fill duration in seconds (auto-computes row limit from sample rate)",
+    )
+    missing_rate_window_s: float = Field(
+        default=5.0,
+        description="Rolling window for missing-data rate calculation in seconds",
+    )
+    resample_interval_ms: float = Field(
+        default=0.0,
+        description="Resample all channels to this interval. 0 = no resampling (keep native rates).",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Top-level platform config
 # ---------------------------------------------------------------------------
 
@@ -86,6 +120,7 @@ class PlatformConfig(BaseModel):
     model: ModelConfig = Field(default_factory=ModelConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     edge: EdgeConfig = Field(default_factory=EdgeConfig)
+    normalizer: NormalizerConfig = Field(default_factory=NormalizerConfig)
 
 
 # ---------------------------------------------------------------------------

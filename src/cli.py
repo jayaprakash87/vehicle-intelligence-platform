@@ -39,7 +39,7 @@ def simulate(
     gen = TelemetryGenerator(cfg.simulation)
     telem_df, labels_df = gen.generate()
 
-    norm = Normalizer()
+    norm = Normalizer(cfg.normalizer)
     telem_df = norm.normalize(telem_df)
 
     writer = StorageWriter(cfg.storage)
@@ -186,7 +186,7 @@ def pipeline(
     console.rule("[bold blue]1. Simulate")
     gen = TelemetryGenerator(cfg.simulation)
     telem_df, labels_df = gen.generate()
-    norm = Normalizer()
+    norm = Normalizer(cfg.normalizer)
     telem_df = norm.normalize(telem_df)
     console.print(f"  {len(telem_df)} telemetry rows, {len(labels_df)} labels")
 

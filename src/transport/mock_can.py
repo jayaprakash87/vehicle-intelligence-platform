@@ -1,8 +1,8 @@
-"""Transport abstraction — mock CAN bus / replay / streaming.
+"""Transport abstraction — CAN / XCP / replay / streaming.
 
 Provides a common interface for telemetry delivery so the downstream
-pipeline doesn't care whether data comes from simulation, replay, or
-a real CAN interface.
+pipeline doesn't care whether data comes from simulation, replay, a
+real CAN interface, or an XCP measurement session.
 """
 
 from __future__ import annotations
@@ -10,9 +10,11 @@ from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from enum import Enum
 
 import pandas as pd
 
+from src.schemas.telemetry import SourceProtocol
 from src.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -77,4 +79,42 @@ class ReplayTransport(DataFrameTransport):
         else:
             df = pd.read_csv(path, parse_dates=["timestamp"])
         log.info("Loaded %d rows from %s", len(df), path)
+        super().__init__(df, realtime=realtime, speed=speed)
+
+
+class XcpTransport(DataFrameTransport):
+    """Simulates an XCP DAQ session with dual-raster measurement.
+
+    In real hardware, XCP provides direct memory reads at configurable
+    DAQ rates — typically 10ms for fast signals (current, voltage) and
+    50ms for slow signals (temperature, status).  This transport tags
+    each row with the source protocol for downstream handling.
+    """
+
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        fast_raster_ms: float = 10.0,
+        slow_raster_ms: float = 50.0,
+        realtime: bool = False,
+        speed: float = 1.0,
+    ) -> None:
+        # Tag rows with source protocol
+        df = df.copy()
+        df["source_protocol"] = SourceProtocol.XCP.value
+        super().__init__(df, realtime=realtime, speed=speed)
+        self.fast_raster_ms = fast_raster_ms
+        self.slow_raster_ms = slow_raster_ms
+        log.info(
+            "XCP transport: fast=%gms, slow=%gms, %d rows",
+            fast_raster_ms, slow_raster_ms, len(df),
+        )
+
+
+class CanTransport(DataFrameTransport):
+    """Tags rows with CAN source protocol for production vehicle data."""
+
+    def __init__(self, df: pd.DataFrame, realtime: bool = False, speed: float = 1.0) -> None:
+        df = df.copy()
+        df["source_protocol"] = SourceProtocol.CAN.value
         super().__init__(df, realtime=realtime, speed=speed)

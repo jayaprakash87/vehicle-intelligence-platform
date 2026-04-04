@@ -1,0 +1,80 @@
+# Production CAN configuration
+# Simulates standard CAN-bus telemetry from production vehicles
+# Typical message rates: 50-100ms depending on CAN message priority
+
+simulation:
+  scenario_id: production_can
+  name: "Production CAN Bus"
+  description: "Production vehicle with CAN-bus telemetry at typical message rates"
+  duration_s: 60.0
+  sample_interval_ms: 100.0  # default CAN message rate
+  seed: 42
+  channels:
+    - channel_id: can_ch01
+      load_name: headlamp_left
+      nominal_current_a: 6.0
+      max_current_a: 15.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 10.0
+      load_type: resistive
+      sample_interval_ms: 50.0   # higher-priority CAN message
+      r_ds_on_ohm: 0.008
+      r_thermal_kw: 35.0
+      tau_thermal_s: 20.0
+    - channel_id: can_ch02
+      load_name: rear_defroster
+      nominal_current_a: 12.0
+      max_current_a: 25.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 20.0
+      load_type: ptc
+      sample_interval_ms: 100.0  # standard CAN rate
+      r_ds_on_ohm: 0.015
+      r_thermal_kw: 45.0
+      tau_thermal_s: 10.0
+    - channel_id: can_ch03
+      load_name: seat_heater
+      nominal_current_a: 8.0
+      max_current_a: 18.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 15.0
+      load_type: resistive
+      sample_interval_ms: 100.0
+      r_ds_on_ohm: 0.010
+      r_thermal_kw: 40.0
+      tau_thermal_s: 15.0
+
+  fault_injections:
+    - channel_id: can_ch01
+      fault_type: overload_spike
+      start_s: 15.0
+      duration_s: 3.0
+      intensity: 0.8
+    - channel_id: can_ch02
+      fault_type: thermal_drift
+      start_s: 20.0
+      duration_s: 15.0
+      intensity: 0.6
+    - channel_id: can_ch03
+      fault_type: gradual_degradation
+      start_s: 10.0
+      duration_s: 30.0
+      intensity: 0.5
+
+features:
+  window_duration_s: 5.0
+  min_duration_s: 1.0
+
+normalizer:
+  ffill_tolerance_s: 0.5
+  missing_rate_window_s: 5.0
+  resample_interval_ms: 0  # no resampling needed — all channels close enough
+
+model:
+  anomaly_contamination: auto
+  anomaly_n_estimators: 100
+  model_dir: artifacts/models
+
+storage:
+  output_dir: output
+  format: parquet

@@ -36,6 +36,13 @@ class FaultType(str, Enum):
     GRADUAL_DEGRADATION = "gradual_degradation"
 
 
+class SourceProtocol(str, Enum):
+    """Telemetry source protocol — determines transport + typical sample rates."""
+    CAN = "can"        # Production vehicles — 20-100 ms typical
+    XCP = "xcp"        # Test vehicles — 10/50 ms DAQ rasters
+    REPLAY = "replay"  # Offline replay from recorded files
+
+
 # ---------------------------------------------------------------------------
 # Core telemetry record — one row per sample per channel
 # ---------------------------------------------------------------------------
@@ -85,6 +92,16 @@ class ChannelMeta(BaseModel):
     max_current_a: float = 20.0
     nominal_voltage_v: float = 13.5
     fuse_rating_a: float = 15.0
+
+    # Sampling rate — per-channel override; 0 means use global default
+    sample_interval_ms: float = Field(
+        default=0.0, ge=0.0,
+        description="Channel sample interval in ms. 0 = use scenario default.",
+    )
+    source_protocol: SourceProtocol = Field(
+        default=SourceProtocol.CAN,
+        description="Source protocol (can | xcp | replay)",
+    )
 
     # Load transient profile
     load_type: str = Field(

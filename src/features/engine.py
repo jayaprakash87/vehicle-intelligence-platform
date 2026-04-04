@@ -30,8 +30,9 @@ class FeatureEngine:
         df = df.copy()
         df.sort_values(["channel_id", "timestamp"], inplace=True)
 
-        w = self.cfg.window_size
-        mp = self.cfg.min_periods
+        # Resolve time-based window to sample counts
+        interval = self._interval_s(df)
+        w, mp = self.cfg.resolve(interval)
 
         grouped = df.groupby("channel_id")
 
