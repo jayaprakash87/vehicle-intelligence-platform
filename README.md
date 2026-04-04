@@ -53,17 +53,30 @@ vip pipeline --json-log
 
 All commands accept `--config` for scenario selection, `--output` for output directory, and `--json-log` for structured logging. Each run creates a timestamped subdirectory (`<output>/<YYYYMMDD-HHMMSS-xxxx>/`) so results are never overwritten.
 
+## Quickstart
+
+```bash
+# Run the full pipeline in one command
+vip pipeline
+
+# Or run the Python quickstart example
+python examples/quickstart.py
+
+# View results in the dashboard
+vip dashboard --data output/quickstart/
+```
+
 ## Tests
 
 ```bash
-pytest tests/ -v          # 226 tests across 18 test files
+pytest tests/ -v          # 246 tests across 20 test files
 ```
 
 ## Project Structure
 
 ```
 src/
-├── cli.py                    # Typer CLI — 7 commands (simulate, replay, train, infer, edge, pipeline, dashboard)
+├── cli.py                    # Typer CLI — 8 commands (simulate, replay, train, infer, edge, pipeline, dashboard)
 ├── schemas/telemetry.py      # Pydantic models: TelemetryRecord, ChannelMeta, ProtectionEvent, EFuseFamily, …
 ├── config/
 │   ├── models.py             # Typed config hierarchy + YAML loader
@@ -81,7 +94,7 @@ src/
 │   └── evaluation.py         # Precision/recall/F1, per-fault metrics, time-to-detect
 ├── inference/pipeline.py     # Feature → score → classify orchestration (batch + streaming)
 ├── edge/runtime.py           # Hardened loop: alert cooldown, heartbeat, hot-reload, signal handling
-├── dashboard/app.py          # Streamlit dashboard: signals, anomalies, faults, protection events, summary
+├── dashboard/app.py          # Streamlit dashboard: signals, anomalies, faults, protection events, summary (+ disk mode)
 ├── storage/writer.py         # Parquet/CSV/JSON output
 └── utils/logging.py          # Structured logging: JSON + pretty formatters, correlation IDs (run_id)
 
@@ -93,7 +106,10 @@ configs/
 ├── xcp_test_bench.yaml       # XCP dual-raster (10ms current + 50ms temperature)
 └── production_can.yaml       # Production CAN bus rates (50–100ms)
 
-tests/                        # 18 test files, 226 tests
+examples/
+└── quickstart.py             # End-to-end demo: generate → train → infer → evaluate → save
+
+tests/                        # 20 test files, 246 tests
 docs/                         # Architecture, implementation plan, design decisions, product strategy
 ```
 
@@ -103,3 +119,4 @@ docs/                         # Architecture, implementation plan, design decisi
 - [Implementation Plan](docs/02_implementation_plan.md) — build phases, module interfaces, test inventory
 - [Design Decisions](docs/03_design_decisions.md) — ADRs with rationale and trade-offs
 - [Product Strategy](docs/04_product_strategy.md) — vision, market positioning, go-to-market, roadmap
+- [Changelog](CHANGELOG.md) — release history
