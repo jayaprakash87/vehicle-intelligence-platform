@@ -19,7 +19,7 @@ simulation:
       r_thermal_kw: 50.0
       tau_thermal_s: 12.0
       t_ambient_c: 30.0
-      adc_bits: 10
+      current_adc_bits: 10
       pink_noise_alpha: 1.2
       emi_amplitude_a: 0.08
       cooldown_s: 0.5

@@ -60,6 +60,15 @@ class EFuseFamily(str, Enum):
     LS_15A = "ls_15a"     # Ground-switch: trunk motor, liftgate
 
 
+class SafetyLevel(str, Enum):
+    """Functional safety compliance level (ISO 26262)."""
+    QM = "qm"           # Quality Management (no ASIL)
+    ASIL_A = "asil_a"
+    ASIL_B = "asil_b"
+    ASIL_C = "asil_c"
+    ASIL_D = "asil_d"
+
+
 # ---------------------------------------------------------------------------
 # eFuse electrical profile — template for a given IC type
 # ---------------------------------------------------------------------------
@@ -67,8 +76,14 @@ class EFuseFamily(str, Enum):
 class EFuseProfile(BaseModel):
     """Electrical + thermal template for an eFuse IC family.
 
-    Used as a catalog entry; individual channels reference a family
-    and inherit these defaults (with optional per-channel overrides).
+    Captures the parameters that actually matter for telemetry simulation
+    and anomaly detection — measurement resolution, protection thresholds,
+    and supply voltage envelope.  IC-specific design details (SPI config,
+    GPIO count, qualification marks) don't affect the data pipeline and
+    are intentionally omitted.
+
+    Different IC families (e.g. Infineon BTS7xxx, NXP MC33HB, TI TPS1H)
+    vary widely in these parameters; defaults are reasonable mid-range values.
     """
     efuse_family: EFuseFamily
     nominal_current_a: float
@@ -79,8 +94,31 @@ class EFuseProfile(BaseModel):
     tau_thermal_s: float = Field(description="Thermal time constant s")
     cooldown_s: float = 1.0
     max_retries: int = 3
-    adc_bits: int = 12
     load_type: str = "resistive"
+
+    # --- ADC sensing ---
+    current_adc_bits: int = Field(default=12, description="Current-sense ADC resolution (varies by IC: 10-16 bit)")
+    voltage_adc_bits: int = Field(default=10, description="Voltage-sense ADC resolution (typ. 10-bit)")
+
+    # --- F(i,t) overcurrent protection ---
+    # Many modern eFuse ICs integrate I²·t energy and trip when the
+    # accumulated energy exceeds a threshold.  This is more realistic
+    # than a simple peak-current comparator.
+    fit_threshold_a2s: float = Field(
+        default=0.0,
+        description="F(i,t) trip threshold in A²·s.  0 = auto-derive from fuse_rating_a² × 0.01",
+    )
+    short_circuit_threshold_a: float = Field(
+        default=0.0,
+        description="Instantaneous short-circuit trip (A).  0 = auto as 3× max_current_a",
+    )
+
+    # --- Supply voltage envelope ---
+    supply_voltage_min_v: float = Field(default=5.5, description="Min supply for rated performance (V)")
+    supply_voltage_max_v: float = Field(default=30.0, description="Max supply for rated performance (V)")
+
+    # --- Safety classification ---
+    safety_level: SafetyLevel = Field(default=SafetyLevel.QM, description="ISO 26262 classification")
 
 
 # ---------------------------------------------------------------------------
@@ -204,11 +242,14 @@ class ChannelMeta(BaseModel):
     t_ambient_c: float = Field(default=25.0, description="Ambient temperature °C")
 
     # Noise profile
-    adc_bits: int = Field(default=12, ge=8, le=16, description="ADC resolution for quantization noise")
+    current_adc_bits: int = Field(default=12, ge=8, le=16, description="Current-sense ADC resolution")
+    voltage_adc_bits: int = Field(default=10, ge=8, le=16, description="Voltage-sense ADC resolution")
     pink_noise_alpha: float = Field(default=1.0, ge=0.0, le=2.0, description="1/f^α noise exponent, 0=white 1=pink")
     emi_amplitude_a: float = Field(default=0.05, ge=0.0, description="EMI spike amplitude in amps")
 
     # Protection behavior
+    fit_threshold_a2s: float = Field(default=0.0, ge=0.0, description="F(i,t) energy threshold A²·s (0 = auto)")
+    short_circuit_threshold_a: float = Field(default=0.0, ge=0.0, description="Instantaneous SCP trip (A) (0 = auto)")
     cooldown_s: float = Field(default=1.0, ge=0.0, description="Auto-retry delay after eFuse trip")
     max_retries: int = Field(default=3, ge=0, description="Max auto-retries before latch-off")
 

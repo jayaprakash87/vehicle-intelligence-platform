@@ -131,9 +131,9 @@ class TelemetryGenerator:
             pink *= 0.1 / (np.std(pink) + 1e-12)
             noise += pink
 
-        # ADC quantization noise
+        # ADC quantization noise (current-sense ADC)
         adc_range = ch.max_current_a * 1.5  # full-scale range
-        lsb = adc_range / (2 ** ch.adc_bits)
+        lsb = adc_range / (2 ** ch.current_adc_bits)
         quant_noise = self.rng.uniform(-lsb / 2, lsb / 2, n)
         noise += quant_noise
 
@@ -242,40 +242,76 @@ class TelemetryGenerator:
         fault_end: int,
         interval_s: float,
     ) -> None:
-        """Model eFuse trip → channel off → cooldown → retry cycle.
+        """Model eFuse F(i,t) energy-integral protection with fast SCP.
 
-        Mutates current, state, trip, reset_counter arrays in-place.
+        Two protection mechanisms run in parallel:
+          1. **Short-circuit (SCP)** — instantaneous comparator trip when
+             current exceeds short_circuit_threshold_a.
+          2. **F(i,t) overcurrent** — trips when cumulative ∫ I² dt exceeds
+             fit_threshold_a2s.  This allows brief inrush spikes but catches
+             sustained overloads.
+
+        After trip: channel off → cooldown → retry → latch-off if max retries
+        exceeded.  Mutates arrays in-place.
         """
+        # Resolve auto thresholds (0 means "derive from profile")
+        fit_thresh = ch.fit_threshold_a2s
+        if fit_thresh <= 0:
+            fit_thresh = ch.fuse_rating_a ** 2 * 0.01  # sensible default
+
+        scp_thresh = ch.short_circuit_threshold_a
+        if scp_thresh <= 0:
+            scp_thresh = ch.max_current_a * 3.0
+
         cooldown_samples = max(int(ch.cooldown_s / interval_s), 1)
         retries_done = 0
         i = fault_start
-
-        # First trip: detect overcurrent
-        trip_point = fault_start + max(int(0.003 / interval_s), 1)  # ~3ms trip time
-        if trip_point >= fault_end:
-            return
+        energy = 0.0  # running ∫ I² dt accumulator
 
         while i < fault_end and retries_done <= ch.max_retries:
-            # Trip event
+            # Scan forward looking for a trip condition
+            tripped = False
+            scan_end = min(fault_end, i + cooldown_samples * 10)  # bounded scan
+            for j in range(i, scan_end):
+                i_abs = abs(current[j])
+
+                # Fast SCP — immediate trip
+                if i_abs >= scp_thresh:
+                    i = j
+                    tripped = True
+                    break
+
+                # F(i,t) energy integration (only when above nominal)
+                if i_abs > ch.nominal_current_a:
+                    energy += (i_abs ** 2) * interval_s
+                else:
+                    # Drain energy slowly when below nominal (thermal dissipation)
+                    energy = max(0.0, energy - (ch.nominal_current_a ** 2) * interval_s * 0.5)
+
+                if energy >= fit_thresh:
+                    i = j
+                    tripped = True
+                    break
+
+            if not tripped:
+                break  # fault current not high enough to trip
+
+            # --- Trip event ---
             trip[i:fault_end] = True
             state[i:fault_end] = False
-            # Channel off during cooldown — current drops to leakage
             cooldown_end = min(i + cooldown_samples, fault_end)
             current[i:cooldown_end] = self.rng.normal(0.001, 0.0005, cooldown_end - i)
             state[i:cooldown_end] = False
 
             retries_done += 1
             reset_counter[cooldown_end:fault_end] = retries_done
+            energy = 0.0  # reset accumulator after trip+cooldown
 
-            # After cooldown, retry (current comes back, may re-trip)
+            # After cooldown, retry
             i = cooldown_end
             if i < fault_end:
                 state[i:fault_end] = True
                 trip[i:fault_end] = False
-                # If still in fault window, current will be high again → next trip
-                # Advance to next trip point
-                next_trip = min(i + max(int(0.010 / interval_s), 1), fault_end)
-                i = next_trip
 
         # If max retries exhausted, latch off for remainder
         if retries_done > ch.max_retries and i < fault_end:
@@ -399,11 +435,18 @@ class TelemetryGenerator:
                 status[sl] = np.where(temperature[sl] > 80, DeviceStatus.WARNING.value, status[sl])
 
         # ADC quantization on final current signal
-        if ch.adc_bits < 16:
+        if ch.current_adc_bits < 16:
             adc_range = ch.max_current_a * 1.5
-            lsb = adc_range / (2 ** ch.adc_bits)
+            lsb = adc_range / (2 ** ch.current_adc_bits)
             valid_mask = ~np.isnan(current)
             current[valid_mask] = np.round(current[valid_mask] / lsb) * lsb
+
+        # ADC quantization on voltage signal (separate, typically lower resolution)
+        if ch.voltage_adc_bits < 16:
+            v_adc_range = ch.nominal_voltage_v * 3.0  # full-scale ~40V for 13.5V nominal
+            v_lsb = v_adc_range / (2 ** ch.voltage_adc_bits)
+            v_valid = ~np.isnan(voltage)
+            voltage[v_valid] = np.round(voltage[v_valid] / v_lsb) * v_lsb
 
         # --- Build DataFrame directly (vectorized — avoids per-row loop) ---
         # Compute cumulative resets vectorized
