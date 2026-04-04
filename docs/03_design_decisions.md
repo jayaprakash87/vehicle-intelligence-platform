@@ -125,3 +125,105 @@ Architecture Decision Records (ADRs) for choices that shaped the system. For sys
 - Target edge hardware (Jetson Nano vs Xavier NX vs Orin) — affects batch size and buffer limits.
 - MQTT or HTTP for alert publishing from edge to backend?
 - Should a Streamlit dashboard ship with the MVP for visual demo?
+
+---
+
+## DD-010: eFuse Catalog and Vehicle Topology Factory
+
+**Context:** The original MVP used flat channel definitions (3 channels with manually specified parameters). Scaling to realistic vehicle configurations (50+ channels) with this approach requires duplicating hundreds of lines of YAML and risks inconsistent electrical parameters.
+
+**Decision:** Introduce a two-layer abstraction:
+1. **eFuse Catalog** (`EFUSE_CATALOG`) — 9 IC family profiles (HS_2A through HS_50A, plus LS variants) with validated electrical and thermal defaults (R_ds_on, R_thermal, τ, nominal/max current).
+2. **Vehicle Topology Factory** — `sedan_topology()` returns a declarative 4-zone, 52-channel configuration. `build_channels()` expands compact channel specs into full `ChannelMeta` by inheriting catalog defaults and zone-level settings.
+
+**Alternatives rejected:**
+- Flat YAML with all 52 channels fully specified — massive duplication, easy to introduce inconsistent R_ds_on values for the same IC family.
+- Database-backed catalog — over-engineered for an MVP; YAML + Python dict is sufficient.
+
+**Consequences:** Adding a new vehicle topology (SUV, truck) requires only a new factory function that returns zone controllers and channel specs. The catalog is reused across all topologies. Per-channel overrides still work for special cases.
+
+---
+
+## DD-011: Multi-Rate Protocol Support (CAN vs XCP)
+
+**Context:** Production vehicles use CAN bus at 50–100ms per channel. Test bench measurements use XCP (Universal Measurement and Calibration Protocol) with dual-raster DAQ — 10ms for fast signals (current, voltage) and 50ms for slow signals (temperature, status). The feature engine originally assumed a single global sample rate.
+
+**Decision:** Support per-channel `sample_interval_ms` in `ChannelMeta`. Add `SourceProtocol` enum (CAN, XCP, REPLAY). `FeatureConfig.resolve(sample_interval_s)` converts time-domain window settings to sample counts automatically. `NormalizerConfig` adds `resample_interval_ms` for optional common-grid alignment.
+
+Transport layer: `XcpTransport` tags rows with `source_protocol=XCP` and simulates dual-raster timing. `CanTransport` tags with `source_protocol=CAN`.
+
+**Alternatives rejected:**
+- Single global rate with downsampling — loses the high-resolution XCP data that's the whole point of test bench measurement.
+- Separate pipelines per protocol — duplicates the entire feature engine and inference path.
+
+**Consequences:** The same config YAML works for both CAN and XCP data. Feature windows auto-scale (a 5s window = 50 samples at 100ms CAN, 500 samples at 10ms XCP). Resampling to a common grid is optional and configurable.
+
+---
+
+## DD-012: Physics-Based Signal Generation
+
+**Context:** The original simulator used simple additive noise and step-function fault injection. This produces signals that are easy to detect but don't stress the pipeline or classifiers in ways that real vehicle data would.
+
+**Decision:** Replace with physics-based models:
+- **First-order RC thermal** — junction temperature from I²R power dissipation with device-specific R_thermal and τ.
+- **Composite noise** — pink (1/f^α), ADC quantization, thermal, and sporadic EMI.
+- **Load-specific inrush** — motor (5×, 50ms), inductive (3×, 20ms), PTC (2×, 500ms).
+- **eFuse protection cycle** — trip → off → cooldown → retry → latch-off with realistic timing.
+- **Bus voltage** — 13.5V nominal + alternator ripple + slow drift.
+- **Fault envelope shaping** — trapezoidal rise/fall and damped oscillation.
+
+**Alternatives rejected:**
+- Statistical replay from recorded data — requires OEM partnership and NDA-protected datasets.
+- Simple Gaussian noise + step faults — too easy for classifiers, doesn't exercise edge cases.
+
+**Consequences:** Synthetic data now exercises the full dynamic range of the classifier. Thermal drift faults require the feature engine to track `temperature_slope` over realistic time constants. Protection cycling tests the `trip_frequency` and `recovery_time_s` features. Signal fidelity is high enough for stakeholder demos without real vehicle data.
+
+---
+
+## DD-013: Structured Logging with Correlation IDs
+
+**Context:** Plain-text log output works for development but is unusable with log aggregation systems (ELK, Datadog). When running multiple pipeline commands in sequence or in parallel, there's no way to correlate log lines from the same run.
+
+**Decision:** All log records include a `run_id` correlation ID (format: `YYYYMMDD-HHMMSS-xxxx`, stored in a `ContextVar`). Two output modes: `_PrettyFormatter` for interactive use (prefixes `[run_id]`), `_JSONFormatter` for aggregation (one JSON object per line with `ts`, `level`, `logger`, `msg`, `run_id` keys). `--json-log` CLI flag switches to JSON mode.
+
+**Alternatives rejected:**
+- OpenTelemetry — heavy dependency for an MVP; correct long-term choice when distributed tracing is needed.
+- Log files per run — adds file management complexity; JSON to stdout is simpler and composable with `jq`, `tee`, etc.
+
+**Consequences:** Every CLI run can be traced through aggregation pipelines. The `run_id` also stamps the output directory (`<output>/<run_id>/`), so log correlation maps 1:1 to on-disk artifacts.
+
+---
+
+## DD-014: Run-ID Output Isolation
+
+**Context:** Sequential runs wrote to the same `output/` directory, silently overwriting `telemetry.parquet`, `scored.parquet`, etc. Results from previous runs were lost without warning.
+
+**Decision:** Every CLI run creates `<output_dir>/<YYYYMMDD-HHMMSS-xxxx>/`. The run ID is the same correlation ID used in logging. Runs never overwrite each other.
+
+**Alternatives rejected:**
+- Append run number (run_001, run_002) — requires scanning the output directory for the latest number, race condition with parallel runs.
+- Prompt before overwrite — blocks non-interactive usage (CI, scripts).
+
+**Consequences:** Output directories accumulate. Users are responsible for cleanup. The timestamped format makes it obvious which run is which.
+
+---
+
+## DD-015: Edge Runtime Hardening
+
+**Context:** The original edge loop was a simple `while not exhausted` loop with no error handling, no monitoring, and no graceful shutdown. This is fine for demos but unusable for production deployment on embedded hardware.
+
+**Decision:** Add six hardening features:
+1. **Alert rate-limiting** — suppress duplicate channel+fault alerts within a configurable cooldown window (`alert_cooldown_s`).
+2. **Heartbeat** — write `heartbeat.json` every N iterations for external watchdog monitoring.
+3. **Model hot-reload** — detect model file mtime change on disk, reload without restarting the loop.
+4. **Signal handling** — SIGINT/SIGTERM → set `_running=False` for graceful shutdown after current batch.
+5. **Error resilience** — track consecutive errors, crash only after a threshold (`max_consecutive_errors`).
+6. **Disk protection** — skip writes when free space drops below `disk_min_free_mb`.
+
+All configurable via `EdgeConfig`.
+
+**Alternatives rejected:**
+- External process supervisor (systemd, supervisord) for restart — still needed in production, but the runtime should handle transient errors itself rather than crash-looping.
+- Alert deduplication in a downstream service — adds latency and infrastructure; throttling at the source is simpler for edge deployment.
+
+**Consequences:** EdgeRuntime is now heavier (~300 lines). The added complexity is justified because edge deployment is the production path. All hardening features are tested independently.
