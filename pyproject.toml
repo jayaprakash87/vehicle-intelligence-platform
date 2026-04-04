@@ -26,6 +26,9 @@ dashboard = [
     "streamlit>=1.30",
     "plotly>=5.18",
 ]
+replay = [
+    "asammdf>=7.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov",

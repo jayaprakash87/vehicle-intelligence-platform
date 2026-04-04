@@ -110,6 +110,79 @@ def simulate(
 
 
 @app.command()
+def replay(
+    data_path: str = typer.Argument(..., help="Path to measurement file (.mf4, .mdf, .csv, .parquet)"),
+    config: str = typer.Option("configs/default.yaml", "--config", "-c"),
+    output_dir: str = typer.Option("output", "--output", "-o"),
+    fmt: str = typer.Option("parquet", "--format", "-f"),
+    channel_id: str = typer.Option("ch_01", "--channel", help="Default channel ID when file has no channel column"),
+    map_current: str = typer.Option("", "--map-current", help="Source signal name for current_a"),
+    map_voltage: str = typer.Option("", "--map-voltage", help="Source signal name for voltage_v"),
+    map_temperature: str = typer.Option("", "--map-temperature", help="Source signal name for temperature_c"),
+    map_timestamp: str = typer.Option("", "--map-timestamp", help="Source signal name for timestamp"),
+    json_log: bool = typer.Option(False, "--json-log", help="Emit structured JSON logs"),
+) -> None:
+    """Replay real measurement data (MDF4/CSV/Parquet) through the VIP pipeline."""
+    from src.features.engine import FeatureEngine
+    from src.inference.pipeline import InferencePipeline
+    from src.ingestion.normalizer import Normalizer
+    from src.ingestion.reader import ColumnMapping, MeasurementReader
+    from src.models.anomaly import AnomalyDetector
+    from src.storage.writer import StorageWriter
+
+    cfg = _setup(config, output_dir, fmt, json_log)
+
+    # Build column mapping from CLI overrides
+    mapping_kwargs: dict[str, str] = {}
+    if map_current:
+        mapping_kwargs["current_a"] = map_current
+    if map_voltage:
+        mapping_kwargs["voltage_v"] = map_voltage
+    if map_temperature:
+        mapping_kwargs["temperature_c"] = map_temperature
+    if map_timestamp:
+        mapping_kwargs["timestamp"] = map_timestamp
+    mapping = ColumnMapping(**mapping_kwargs)
+
+    # Read measurement file
+    reader = MeasurementReader(mapping=mapping, default_channel_id=channel_id)
+    try:
+        telem_df = reader.read(data_path)
+    except Exception as exc:
+        _abort(f"Failed to read measurement file: {exc}")
+    console.print(f"  Loaded {len(telem_df)} rows from [bold]{data_path}[/bold]")
+
+    # Normalize
+    norm = Normalizer(cfg.normalizer)
+    telem_df = norm.normalize(telem_df)
+
+    # Features + train + infer
+    engine = FeatureEngine(cfg.features)
+    feat_df = engine.compute(telem_df)
+
+    detector = AnomalyDetector(cfg.model)
+    model_file = Path(cfg.model.model_dir) / "anomaly_detector.joblib"
+    if model_file.exists():
+        detector.load()
+        console.print("[dim]Loaded pre-trained model[/dim]")
+    else:
+        console.print("[dim]No pre-trained model — training on this data[/dim]")
+        detector.train(feat_df)
+        detector.save()
+
+    pipeline = InferencePipeline(cfg.features, cfg.model, detector)
+    scored = pipeline.run_batch(telem_df)
+
+    # Persist
+    writer = StorageWriter(cfg.storage)
+    writer.write_telemetry(telem_df)
+    writer.write_scored(scored)
+    console.print(f"  Output written to {cfg.storage.output_dir}/")
+
+    _print_summary(scored)
+
+
+@app.command()
 def train(
     config: str = typer.Option("configs/default.yaml", "--config", "-c"),
     data_path: str = typer.Option("output/telemetry.parquet", "--data", "-d"),

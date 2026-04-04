@@ -41,7 +41,7 @@ All commands accept `--config` for scenario selection, `--output` for output dir
 ## Tests
 
 ```bash
-pytest tests/ -v          # 152 tests across 17 test files
+pytest tests/ -v          # 184 tests across 17 test files
 ```
 
 ## Project Structure
@@ -49,7 +49,7 @@ pytest tests/ -v          # 152 tests across 17 test files
 ```
 src/
 ├── cli.py                  # Typer CLI — 5 commands with error handling & run-ID isolation
-├── schemas/telemetry.py    # Pydantic models: TelemetryRecord, ChannelMeta, EFuseFamily, SourceProtocol, …
+├── schemas/telemetry.py    # Pydantic models: TelemetryRecord, ChannelMeta, ProtectionEvent, EFuseFamily, …
 ├── config/
 │   ├── models.py           # Typed config hierarchy + YAML loader
 │   └── catalog.py          # eFuse IC catalog (9 families), vehicle topology factory, channel builder
@@ -71,7 +71,7 @@ configs/
 ├── xcp_test_bench.yaml     # XCP dual-raster (10ms current + 50ms temperature)
 └── production_can.yaml     # Production CAN bus rates (50–100ms)
 
-tests/                      # 17 test files, 152 tests
+tests/                      # 17 test files, 184 tests
 docs/                       # Architecture, implementation plan, design decisions
 ```
 
@@ -80,3 +80,4 @@ docs/                       # Architecture, implementation plan, design decision
 - [Architecture](docs/01_architecture.md) — system design, data flow, module graph, schemas, vehicle topology
 - [Implementation Plan](docs/02_implementation_plan.md) — build phases, module interfaces, test inventory
 - [Design Decisions](docs/03_design_decisions.md) — ADRs with rationale and trade-offs
+- [Product Strategy](docs/04_product_strategy.md) — vision, market positioning, go-to-market, roadmap
