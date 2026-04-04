@@ -43,6 +43,78 @@ class SourceProtocol(str, Enum):
     REPLAY = "replay"  # Offline replay from recorded files
 
 
+class EFuseFamily(str, Enum):
+    """eFuse IC families by current class and switch topology.
+
+    Names follow industry convention: HS = high-side, LS = low-side.
+    The suffix is the rated continuous current.
+    """
+    HS_2A = "hs_2a"       # Interior LEDs, indicators, small sensors
+    HS_5A = "hs_5a"       # Dome lights, mirror fold, rain sensors
+    HS_10A = "hs_10a"     # Headlamps, fog lights, horn
+    HS_15A = "hs_15a"     # Wipers, power windows, heated mirrors
+    HS_20A = "hs_20a"     # Power seats, sunroof
+    HS_30A = "hs_30a"     # Seat heaters, rear defroster, fuel pump
+    HS_50A = "hs_50a"     # HVAC blower, starter relay, engine fan
+    LS_5A = "ls_5a"       # Ground-switch: ambient lighting, footwell LEDs
+    LS_15A = "ls_15a"     # Ground-switch: trunk motor, liftgate
+
+
+# ---------------------------------------------------------------------------
+# eFuse electrical profile — template for a given IC type
+# ---------------------------------------------------------------------------
+
+class EFuseProfile(BaseModel):
+    """Electrical + thermal template for an eFuse IC family.
+
+    Used as a catalog entry; individual channels reference a family
+    and inherit these defaults (with optional per-channel overrides).
+    """
+    efuse_family: EFuseFamily
+    nominal_current_a: float
+    max_current_a: float
+    fuse_rating_a: float
+    r_ds_on_ohm: float = Field(description="MOSFET on-resistance Ω")
+    r_thermal_kw: float = Field(description="Thermal resistance °C/W")
+    tau_thermal_s: float = Field(description="Thermal time constant s")
+    cooldown_s: float = 1.0
+    max_retries: int = 3
+    adc_bits: int = 12
+    load_type: str = "resistive"
+
+
+# ---------------------------------------------------------------------------
+# Zone Controller — physical ECU hosting eFuse ICs
+# ---------------------------------------------------------------------------
+
+class ZoneController(BaseModel):
+    """Zone Controller — the physical ECU/gateway hosting eFuse ICs.
+
+    A vehicle typically has 2-4 Zone Controllers (body, front, rear,
+    underhood).  Each Zone Controller runs a CDD (Complex Device Driver)
+    — the AUTOSAR software layer that reads eFuse IC registers via SPI,
+    measures current/voltage/temperature, and passes the signals via
+    CAN or LIN to the application layer.
+
+    Architecture:
+        eFuse IC (HW) → SPI → CDD (SW driver) → COM stack → CAN/LIN bus
+    """
+    zone_id: str = Field(description="Unique Zone Controller identifier, e.g. 'zone_body'")
+    name: str = Field(default="", description="Human-readable name, e.g. 'Body Zone Controller'")
+    location: str = Field(
+        default="body",
+        description="Physical location: body | front | rear | underhood",
+    )
+    bus_interface: SourceProtocol = Field(
+        default=SourceProtocol.CAN,
+        description="Communication bus this zone controller's CDD publishes on",
+    )
+    cdd_read_cycle_ms: float = Field(
+        default=10.0,
+        description="CDD SPI read cycle in ms — how often the driver polls eFuse registers",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Core telemetry record — one row per sample per channel
 # ---------------------------------------------------------------------------
@@ -84,7 +156,13 @@ class EventLabel(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ChannelMeta(BaseModel):
-    """Static metadata describing one eFuse / load channel."""
+    """Static metadata describing one eFuse / load channel.
+
+    Each channel represents one output of a Zone Controller, connected
+    to one or more vehicle loads through a specific eFuse IC type.
+    The CDD (Complex Device Driver) on the Zone Controller reads this
+    channel's eFuse registers via SPI and publishes the measured signals.
+    """
 
     channel_id: str
     load_name: str = ""
@@ -92,6 +170,14 @@ class ChannelMeta(BaseModel):
     max_current_a: float = 20.0
     nominal_voltage_v: float = 13.5
     fuse_rating_a: float = 15.0
+
+    # eFuse type + physical grouping
+    efuse_family: EFuseFamily = Field(default=EFuseFamily.HS_15A, description="eFuse IC family / current class")
+    zone_id: str = Field(default="", description="Zone Controller this channel belongs to (empty = unassigned)")
+    connected_loads: list[str] = Field(
+        default_factory=list,
+        description="Vehicle systems connected to this channel, e.g. ['seat_heater_left', 'lumbar_support_left']",
+    )
 
     # Sampling rate — per-channel override; 0 means use global default
     sample_interval_ms: float = Field(

@@ -59,8 +59,8 @@ class TelemetryGenerator:
         bus_voltage_fine = self._generate_bus_voltage(n_finest, finest_s)
         fine_times = np.arange(n_finest) * finest_s  # seconds from t0
 
-        all_rows: list[dict] = []
-        all_labels: list[dict] = []
+        all_telem: list[pd.DataFrame] = []
+        all_labels: list[pd.DataFrame] = []
 
         for ch in self.cfg.channels:
             interval_ms = ch_intervals[ch.channel_id]
@@ -79,12 +79,12 @@ class TelemetryGenerator:
                     bus_voltage = np.pad(bus_voltage, (0, n_samples - len(bus_voltage)), mode="edge")
 
             ch_faults = [f for f in self.cfg.fault_injections if f.channel_id == ch.channel_id]
-            rows, labels = self._generate_channel(timestamps, ch, ch_faults, bus_voltage, interval_s)
-            all_rows.extend(rows)
-            all_labels.extend(labels)
+            ch_df, label_df = self._generate_channel(timestamps, ch, ch_faults, bus_voltage, interval_s)
+            all_telem.append(ch_df)
+            all_labels.append(label_df)
 
-        telem_df = pd.DataFrame(all_rows)
-        labels_df = pd.DataFrame(all_labels)
+        telem_df = pd.concat(all_telem, ignore_index=True) if all_telem else pd.DataFrame()
+        labels_df = pd.concat(all_labels, ignore_index=True) if all_labels else pd.DataFrame()
 
         log.info(
             "Generated %d telemetry rows, %d labels across %d channels",
@@ -294,7 +294,7 @@ class TelemetryGenerator:
         faults: list[FaultInjection],
         bus_voltage: np.ndarray,
         interval_s: float,
-    ) -> tuple[list[dict], list[dict]]:
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         n = len(timestamps)
 
         # --- Nominal baselines ---
@@ -405,36 +405,42 @@ class TelemetryGenerator:
             valid_mask = ~np.isnan(current)
             current[valid_mask] = np.round(current[valid_mask] / lsb) * lsb
 
-        # --- Build row dicts ---
-        rows: list[dict] = []
-        labels: list[dict] = []
-        cumulative_resets = 0
-        for i in range(n):
-            if i > 0 and trip[i] and not trip[i - 1]:
-                cumulative_resets += 1
-            cumulative_resets = max(cumulative_resets, int(reset_counter[i]))
+        # --- Build DataFrame directly (vectorized — avoids per-row loop) ---
+        # Compute cumulative resets vectorized
+        trip_edges = np.diff(trip.astype(int), prepend=0)
+        trip_rising = (trip_edges == 1).astype(int)
+        cum_resets_from_edges = np.cumsum(trip_rising)
+        cum_resets = np.maximum(cum_resets_from_edges, reset_counter.astype(int))
 
-            rows.append({
-                "timestamp": timestamps[i],
+        # Replace NaN with None for nullable columns
+        current_out = current.copy()
+        voltage_out = voltage.copy()
+
+        ch_df = pd.DataFrame({
+            "timestamp": timestamps,
+            "channel_id": ch.channel_id,
+            "current_a": current_out,
+            "voltage_v": voltage_out,
+            "temperature_c": temperature,
+            "state_on_off": state,
+            "trip_flag": trip,
+            "overload_flag": overload,
+            "reset_counter": cum_resets,
+            "pwm_duty_pct": pwm,
+            "device_status": status,
+        })
+
+        # Build labels for fault windows
+        fault_mask = fault_active != FaultType.NONE.value
+        if fault_mask.any():
+            label_df = pd.DataFrame({
+                "timestamp": np.array(timestamps)[fault_mask],
                 "channel_id": ch.channel_id,
-                "current_a": float(current[i]) if not np.isnan(current[i]) else None,
-                "voltage_v": float(voltage[i]) if not np.isnan(voltage[i]) else None,
-                "temperature_c": float(temperature[i]),
-                "state_on_off": bool(state[i]),
-                "trip_flag": bool(trip[i]),
-                "overload_flag": bool(overload[i]),
-                "reset_counter": cumulative_resets,
-                "pwm_duty_pct": float(pwm[i]),
-                "device_status": status[i],
+                "fault_type": fault_active[fault_mask],
+                "severity": severity[fault_mask],
+                "description": [f"{ft} on {ch.channel_id}" for ft in fault_active[fault_mask]],
             })
+        else:
+            label_df = pd.DataFrame(columns=["timestamp", "channel_id", "fault_type", "severity", "description"])
 
-            if fault_active[i] != FaultType.NONE.value:
-                labels.append({
-                    "timestamp": timestamps[i],
-                    "channel_id": ch.channel_id,
-                    "fault_type": fault_active[i],
-                    "severity": float(severity[i]),
-                    "description": f"{fault_active[i]} on {ch.channel_id}",
-                })
-
-        return rows, labels
+        return ch_df, label_df

@@ -11,7 +11,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field
 
-from src.schemas.telemetry import ChannelMeta, FaultInjection
+from src.schemas.telemetry import ChannelMeta, FaultInjection, ZoneController
 
 
 # ---------------------------------------------------------------------------
@@ -25,12 +25,22 @@ class SimulationConfig(BaseModel):
     duration_s: float = 60.0
     sample_interval_ms: float = 100.0
     seed: int = 42
+    zones: list[ZoneController] = Field(default_factory=list, description="Zone Controllers in the vehicle")
     channels: list[ChannelMeta] = Field(default_factory=lambda: [
         ChannelMeta(channel_id="ch_01", load_name="headlamp_left", nominal_current_a=6.0),
         ChannelMeta(channel_id="ch_02", load_name="rear_defroster", nominal_current_a=12.0),
         ChannelMeta(channel_id="ch_03", load_name="seat_heater", nominal_current_a=8.0),
     ])
+    # Compact channel definitions — expanded via catalog if present
+    channel_specs: list[dict] = Field(
+        default_factory=list,
+        description="Compact channel specs referencing eFuse catalog. Expanded to channels by build_channels().",
+    )
     fault_injections: list[FaultInjection] = Field(default_factory=list)
+    vehicle_topology: str = Field(
+        default="",
+        description="Predefined topology name: 'sedan' | '' (use explicit channels)",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -128,13 +138,53 @@ class PlatformConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 def load_config(path: str | Path) -> PlatformConfig:
-    """Load a PlatformConfig from a YAML or JSON file."""
+    """Load a PlatformConfig from a YAML or JSON file.
+
+    After parsing, resolves vehicle topology:
+      - If vehicle_topology is set (e.g. 'sedan'), loads that topology
+      - If channel_specs are present, expands them via the eFuse catalog
+      - Otherwise uses the explicit channels list as-is
+    """
     path = Path(path)
     with open(path) as f:
         raw = yaml.safe_load(f)
-    return PlatformConfig.model_validate(raw)
+    cfg = PlatformConfig.model_validate(raw)
+    _resolve_topology(cfg)
+    return cfg
 
 
 def default_config() -> PlatformConfig:
     """Return a sensible default config for quick starts."""
     return PlatformConfig()
+
+
+def _resolve_topology(cfg: PlatformConfig) -> None:
+    """Expand vehicle_topology or channel_specs into concrete channels."""
+    sim = cfg.simulation
+
+    # Named topology takes priority
+    if sim.vehicle_topology:
+        from src.config.catalog import build_channels, sedan_topology
+
+        topologies = {
+            "sedan": sedan_topology,
+        }
+        factory = topologies.get(sim.vehicle_topology)
+        if factory is None:
+            raise ValueError(
+                f"Unknown vehicle_topology '{sim.vehicle_topology}'. "
+                f"Available: {list(topologies.keys())}"
+            )
+        zones, specs = factory()
+        sim.zones = zones
+        sim.channels = build_channels(zones, specs)
+        return
+
+    # Compact channel_specs with explicit zones
+    if sim.channel_specs:
+        from src.config.catalog import build_channels
+
+        sim.channels = build_channels(sim.zones, sim.channel_specs)
+        return
+
+    # Otherwise: use explicit channels list as-is (backward compatible)
