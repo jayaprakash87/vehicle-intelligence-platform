@@ -56,6 +56,31 @@ class TestEFuseCatalog:
         assert p.efuse_family == EFuseFamily.HS_10A
         assert p.nominal_current_a == 6.0
 
+    def test_all_profiles_have_ic_identity(self):
+        """Every catalog entry should reference a real IC part number."""
+        for fam, profile in EFUSE_CATALOG.items():
+            assert profile.ic_part_number != "", f"{fam}: missing ic_part_number"
+            assert profile.manufacturer != "", f"{fam}: missing manufacturer"
+            assert profile.channels_per_ic >= 1
+
+    def test_known_manufacturers(self):
+        manufacturers = {p.manufacturer for p in EFUSE_CATALOG.values()}
+        assert manufacturers <= {"Infineon", "STMicroelectronics"}, f"Unexpected: {manufacturers}"
+
+    def test_multi_channel_ics(self):
+        """Multi-channel ICs (TLE92104, VND7140AJ) should report channels > 1."""
+        hs_10a = get_profile(EFuseFamily.HS_10A)  # TLE92104 = 4ch
+        assert hs_10a.channels_per_ic == 4
+        hs_15a = get_profile(EFuseFamily.HS_15A)  # VND7140AJ = 2ch
+        assert hs_15a.channels_per_ic == 2
+
+    def test_h_bridge_ic_in_catalog(self):
+        """VNH9045 H-bridge should have driver_type H_BRIDGE."""
+        from src.schemas.telemetry import DriverType
+        ls_15a = get_profile(EFuseFamily.LS_15A)
+        assert ls_15a.ic_part_number == "VNH9045"
+        assert ls_15a.driver_type == DriverType.H_BRIDGE
+
 
 # ---------------------------------------------------------------------------
 # Vehicle topology

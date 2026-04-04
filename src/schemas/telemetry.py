@@ -105,12 +105,11 @@ class EFuseProfile(BaseModel):
 
     Captures the parameters that actually matter for telemetry simulation
     and anomaly detection — measurement resolution, protection thresholds,
-    and supply voltage envelope.  IC-specific design details (SPI config,
-    GPIO count, qualification marks) don't affect the data pipeline and
-    are intentionally omitted.
+    and supply voltage envelope.
 
-    Different IC families (e.g. Infineon BTS7xxx, NXP MC33HB, TI TPS1H)
-    vary widely in these parameters; defaults are reasonable mid-range values.
+    Each profile represents a specific IC or IC family (e.g. Infineon
+    BTS7006-1EPP, ST VND7140AJ).  The optional identification fields
+    (ic_part_number, manufacturer) provide traceability to real datasheets.
     """
     efuse_family: EFuseFamily
     nominal_current_a: float
@@ -122,6 +121,18 @@ class EFuseProfile(BaseModel):
     cooldown_s: float = 1.0
     max_retries: int = 3
     load_type: str = "resistive"
+
+    # --- IC identification (optional — for traceability to real datasheets) ---
+    ic_part_number: str = Field(default="", description="IC part number, e.g. 'BTS7006-1EPP'")
+    manufacturer: str = Field(default="", description="IC vendor, e.g. 'Infineon', 'STMicroelectronics'")
+    channels_per_ic: int = Field(
+        default=1,
+        description="Output channels per physical IC package (e.g. 2 for VND7140AJ dual, 4 for TLE92104)",
+    )
+    driver_type: DriverType = Field(
+        default=DriverType.HIGH_SIDE,
+        description="Switch topology — high-side, low-side, H-bridge, half-bridge",
+    )
 
     # --- ADC sensing ---
     current_adc_bits: int = Field(default=12, description="Current-sense ADC resolution (varies by IC: 10-16 bit)")
