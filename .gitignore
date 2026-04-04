@@ -1,0 +1,12 @@
+output/
+artifacts/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+dist/
+build/
+*.pyc
+.ruff_cache/
+.venv/
+*.egg
+.DS_Store
