@@ -192,6 +192,11 @@ class TelemetryGenerator:
                 # PTC thermistor: 2x cold-start for 500ms, decaying
                 n_inrush = max(int(0.500 / interval_s), 1)
                 factor = 2.0
+            elif ch.load_type == "capacitive":
+                # Capacitive: sharp spike (input caps charging), very fast decay
+                # Typical: 8-10x for <10ms, RC-shaped
+                n_inrush = max(int(0.010 / interval_s), 1)
+                factor = 8.0
             else:
                 return current  # resistive: no transient
         else:
@@ -199,8 +204,14 @@ class TelemetryGenerator:
             factor = ch.inrush_factor
 
         n_inrush = min(n_inrush, len(current))
-        # Exponential decay from peak to nominal
-        decay = np.exp(-3 * np.arange(n_inrush) / n_inrush)  # ~95% settled by end
+
+        if ch.load_type == "capacitive" and ch.inrush_factor <= 1.0:
+            # Capacitive loads: fast RC discharge shape (steeper than exponential)
+            decay = np.exp(-5 * np.arange(n_inrush) / max(n_inrush, 1))
+        else:
+            # All other loads: standard exponential decay (~95% settled by end)
+            decay = np.exp(-3 * np.arange(n_inrush) / max(n_inrush, 1))
+
         inrush_envelope = 1.0 + (factor - 1.0) * decay
         current[:n_inrush] *= inrush_envelope
 

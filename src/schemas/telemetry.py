@@ -69,6 +69,33 @@ class SafetyLevel(str, Enum):
     ASIL_D = "asil_d"
 
 
+class DriverType(str, Enum):
+    """Switch topology of the eFuse / power driver IC.
+
+    Affects current measurement polarity, ground-offset behaviour,
+    and which fault signatures are physically possible.
+    """
+    HIGH_SIDE = "high_side"      # Battery → switch → load → GND (most common)
+    LOW_SIDE = "low_side"        # Battery → load → switch → GND
+    H_BRIDGE = "h_bridge"        # Bidirectional motor drive
+    HALF_BRIDGE = "half_bridge"  # Push-pull (coils, injectors)
+
+
+class PowerClass(str, Enum):
+    """Power rail / ignition-state dependency of a channel.
+
+    Determines when the channel is expected to be energised:
+      - ALWAYS_ON: permanent battery (KL30) — clock, hazard, memory keep-alive
+      - IGNITION:  key-on supply (KL15) — most body/chassis functions
+      - ACCESSORY: accessory rail (KLR) — radio, windows after key-off
+      - START:     starter rail (KL50) — only during crank
+    """
+    ALWAYS_ON = "always_on"     # KL30 — permanent battery
+    IGNITION = "ignition"       # KL15 — powered when ignition on
+    ACCESSORY = "accessory"     # KLR  — powered in accessory mode
+    START = "start"             # KL50 — powered only during crank
+
+
 # ---------------------------------------------------------------------------
 # eFuse electrical profile — template for a given IC type
 # ---------------------------------------------------------------------------
@@ -217,6 +244,30 @@ class ChannelMeta(BaseModel):
         description="Vehicle systems connected to this channel, e.g. ['seat_heater_left', 'lumbar_support_left']",
     )
 
+    # --- Vehicle system hierarchy (ZC IO → Cluster → System → Component) ---
+    system_cluster: str = Field(
+        default="",
+        description="Top-level grouping, e.g. 'exterior_lighting', 'body_comfort', 'powertrain'",
+    )
+    system_name: str = Field(
+        default="",
+        description="Sub-system under cluster, e.g. 'front_lighting', 'seating', 'engine_cooling'",
+    )
+
+    # --- IO characteristics ---
+    driver_type: DriverType = Field(
+        default=DriverType.HIGH_SIDE,
+        description="Switch topology — affects current polarity and measurement",
+    )
+    power_class: PowerClass = Field(
+        default=PowerClass.IGNITION,
+        description="Power rail — when channel is expected to be energised",
+    )
+    pwm_capable: bool = Field(
+        default=False,
+        description="Whether the IO supports PWM switching (dimming, flash patterns)",
+    )
+
     # Sampling rate — per-channel override; 0 means use global default
     sample_interval_ms: float = Field(
         default=0.0, ge=0.0,
@@ -230,7 +281,7 @@ class ChannelMeta(BaseModel):
     # Load transient profile
     load_type: str = Field(
         default="resistive",
-        description="Load model: resistive | inductive | motor | ptc",
+        description="Load model: resistive | inductive | motor | ptc | capacitive",
     )
     inrush_factor: float = Field(default=1.0, ge=1.0, description="Turn-on current multiplier vs nominal")
     inrush_duration_ms: float = Field(default=0.0, ge=0.0, description="Inrush transient duration in ms")

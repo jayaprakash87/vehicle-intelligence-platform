@@ -17,8 +17,10 @@ from __future__ import annotations
 
 from src.schemas.telemetry import (
     ChannelMeta,
+    DriverType,
     EFuseFamily,
     EFuseProfile,
+    PowerClass,
     SourceProtocol,
     ZoneController,
 )
@@ -208,7 +210,10 @@ def sedan_topology() -> tuple[list[ZoneController], list[dict]]:
     _ch = 0
 
     def _add(zone_id: str, family: str, load_name: str, load_type: str = "resistive",
-             connected_loads: list[str] | None = None, **kw) -> None:
+             connected_loads: list[str] | None = None,
+             system_cluster: str = "", system_name: str = "",
+             driver_type: str = "high_side", power_class: str = "ignition",
+             pwm_capable: bool = False, **kw) -> None:
         nonlocal _ch
         _ch += 1
         s: dict = {
@@ -218,72 +223,179 @@ def sedan_topology() -> tuple[list[ZoneController], list[dict]]:
             "load_name": load_name,
             "load_type": load_type,
             "connected_loads": connected_loads or [load_name],
+            "system_cluster": system_cluster,
+            "system_name": system_name,
+            "driver_type": driver_type,
+            "power_class": power_class,
+            "pwm_capable": pwm_capable,
         }
         s.update(kw)
         specs.append(s)
 
     # ── Body zone (16 channels) ──────────────────────────────────
-    _add("zone_body", "hs_2a", "dome_light",          connected_loads=["dome_light", "map_light_left", "map_light_right"])
-    _add("zone_body", "hs_2a", "ambient_led_driver",  connected_loads=["ambient_footwell", "ambient_door"])
-    _add("zone_body", "hs_2a", "courtesy_light_left")
-    _add("zone_body", "hs_2a", "courtesy_light_right")
-    _add("zone_body", "hs_5a", "mirror_fold_left",    load_type="motor", inrush_factor=3.0, inrush_duration_ms=30.0)
-    _add("zone_body", "hs_5a", "mirror_fold_right",   load_type="motor", inrush_factor=3.0, inrush_duration_ms=30.0)
-    _add("zone_body", "hs_5a", "mirror_heater_left",  load_type="ptc")
-    _add("zone_body", "hs_5a", "mirror_heater_right", load_type="ptc")
-    _add("zone_body", "hs_10a", "door_lock_left",     load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0)
-    _add("zone_body", "hs_10a", "door_lock_right",    load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0)
-    _add("zone_body", "hs_15a", "window_left_front",  load_type="motor", inrush_factor=5.0, inrush_duration_ms=50.0)
-    _add("zone_body", "hs_15a", "window_right_front", load_type="motor", inrush_factor=5.0, inrush_duration_ms=50.0)
-    _add("zone_body", "hs_15a", "window_left_rear",   load_type="motor", inrush_factor=5.0, inrush_duration_ms=50.0)
-    _add("zone_body", "hs_15a", "window_right_rear",  load_type="motor", inrush_factor=5.0, inrush_duration_ms=50.0)
+    _add("zone_body", "hs_2a", "dome_light",
+         connected_loads=["dome_light", "map_light_left", "map_light_right"],
+         system_cluster="interior_lighting", system_name="cabin_lights",
+         pwm_capable=True)
+    _add("zone_body", "hs_2a", "ambient_led_driver",
+         connected_loads=["ambient_footwell", "ambient_door"],
+         system_cluster="interior_lighting", system_name="ambient_lights",
+         pwm_capable=True)
+    _add("zone_body", "hs_2a", "courtesy_light_left",
+         system_cluster="interior_lighting", system_name="entry_lights",
+         pwm_capable=True)
+    _add("zone_body", "hs_2a", "courtesy_light_right",
+         system_cluster="interior_lighting", system_name="entry_lights",
+         pwm_capable=True)
+    _add("zone_body", "hs_5a", "mirror_fold_left",    load_type="motor", inrush_factor=3.0, inrush_duration_ms=30.0,
+         system_cluster="body_comfort", system_name="mirrors",
+         driver_type="h_bridge")
+    _add("zone_body", "hs_5a", "mirror_fold_right",   load_type="motor", inrush_factor=3.0, inrush_duration_ms=30.0,
+         system_cluster="body_comfort", system_name="mirrors",
+         driver_type="h_bridge")
+    _add("zone_body", "hs_5a", "mirror_heater_left",  load_type="ptc",
+         system_cluster="body_comfort", system_name="mirrors",
+         pwm_capable=True)
+    _add("zone_body", "hs_5a", "mirror_heater_right", load_type="ptc",
+         system_cluster="body_comfort", system_name="mirrors",
+         pwm_capable=True)
+    _add("zone_body", "hs_10a", "door_lock_left",     load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0,
+         system_cluster="body_comfort", system_name="central_locking",
+         driver_type="h_bridge")
+    _add("zone_body", "hs_10a", "door_lock_right",    load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0,
+         system_cluster="body_comfort", system_name="central_locking",
+         driver_type="h_bridge")
+    _add("zone_body", "hs_15a", "window_left_front",  load_type="motor", inrush_factor=5.0, inrush_duration_ms=50.0,
+         system_cluster="body_comfort", system_name="power_windows",
+         driver_type="h_bridge")
+    _add("zone_body", "hs_15a", "window_right_front", load_type="motor", inrush_factor=5.0, inrush_duration_ms=50.0,
+         system_cluster="body_comfort", system_name="power_windows",
+         driver_type="h_bridge")
+    _add("zone_body", "hs_15a", "window_left_rear",   load_type="motor", inrush_factor=5.0, inrush_duration_ms=50.0,
+         system_cluster="body_comfort", system_name="power_windows",
+         driver_type="h_bridge")
+    _add("zone_body", "hs_15a", "window_right_rear",  load_type="motor", inrush_factor=5.0, inrush_duration_ms=50.0,
+         system_cluster="body_comfort", system_name="power_windows",
+         driver_type="h_bridge")
     _add("zone_body", "hs_30a", "seat_heater_left",   load_type="ptc",
-         connected_loads=["seat_heater_left", "lumbar_support_left"])
+         connected_loads=["seat_heater_left", "lumbar_support_left"],
+         system_cluster="body_comfort", system_name="seating",
+         pwm_capable=True)
     _add("zone_body", "hs_30a", "seat_heater_right",  load_type="ptc",
-         connected_loads=["seat_heater_right", "lumbar_support_right"])
+         connected_loads=["seat_heater_right", "lumbar_support_right"],
+         system_cluster="body_comfort", system_name="seating",
+         pwm_capable=True)
 
     # ── Front zone (14 channels) ─────────────────────────────────
-    _add("zone_front", "hs_10a", "headlamp_low_left")
-    _add("zone_front", "hs_10a", "headlamp_low_right")
-    _add("zone_front", "hs_10a", "headlamp_high_left")
-    _add("zone_front", "hs_10a", "headlamp_high_right")
-    _add("zone_front", "hs_5a", "drl_left",          connected_loads=["drl_left", "turn_signal_left"])
-    _add("zone_front", "hs_5a", "drl_right",         connected_loads=["drl_right", "turn_signal_right"])
-    _add("zone_front", "hs_5a", "fog_light_left")
-    _add("zone_front", "hs_5a", "fog_light_right")
-    _add("zone_front", "hs_15a", "wiper_front",      load_type="motor", inrush_factor=5.0, inrush_duration_ms=60.0)
-    _add("zone_front", "hs_5a", "washer_pump",       load_type="motor", inrush_factor=3.0, inrush_duration_ms=30.0)
-    _add("zone_front", "hs_10a", "horn",             load_type="inductive")
-    _add("zone_front", "hs_2a", "rain_sensor")
-    _add("zone_front", "hs_5a", "adas_camera_power", connected_loads=["front_camera", "radar_sensor"])
-    _add("zone_front", "hs_2a", "adas_lidar_power")
+    _add("zone_front", "hs_10a", "headlamp_low_left",
+         system_cluster="exterior_lighting", system_name="front_lighting",
+         pwm_capable=True)
+    _add("zone_front", "hs_10a", "headlamp_low_right",
+         system_cluster="exterior_lighting", system_name="front_lighting",
+         pwm_capable=True)
+    _add("zone_front", "hs_10a", "headlamp_high_left",
+         system_cluster="exterior_lighting", system_name="front_lighting")
+    _add("zone_front", "hs_10a", "headlamp_high_right",
+         system_cluster="exterior_lighting", system_name="front_lighting")
+    _add("zone_front", "hs_5a", "drl_left",
+         connected_loads=["drl_left", "turn_signal_left"],
+         system_cluster="exterior_lighting", system_name="front_lighting",
+         pwm_capable=True, power_class="always_on")
+    _add("zone_front", "hs_5a", "drl_right",
+         connected_loads=["drl_right", "turn_signal_right"],
+         system_cluster="exterior_lighting", system_name="front_lighting",
+         pwm_capable=True, power_class="always_on")
+    _add("zone_front", "hs_5a", "fog_light_left",
+         system_cluster="exterior_lighting", system_name="front_lighting")
+    _add("zone_front", "hs_5a", "fog_light_right",
+         system_cluster="exterior_lighting", system_name="front_lighting")
+    _add("zone_front", "hs_15a", "wiper_front",      load_type="motor", inrush_factor=5.0, inrush_duration_ms=60.0,
+         system_cluster="driver_assist", system_name="wipers")
+    _add("zone_front", "hs_5a", "washer_pump",       load_type="motor", inrush_factor=3.0, inrush_duration_ms=30.0,
+         system_cluster="driver_assist", system_name="wipers")
+    _add("zone_front", "hs_10a", "horn",             load_type="inductive",
+         system_cluster="driver_assist", system_name="signalling",
+         power_class="always_on")
+    _add("zone_front", "hs_2a", "rain_sensor",
+         system_cluster="driver_assist", system_name="sensors",
+         load_type="capacitive")
+    _add("zone_front", "hs_5a", "adas_camera_power",
+         connected_loads=["front_camera", "radar_sensor"],
+         system_cluster="adas", system_name="perception",
+         load_type="capacitive")
+    _add("zone_front", "hs_2a", "adas_lidar_power",
+         system_cluster="adas", system_name="perception",
+         load_type="capacitive")
 
     # ── Rear zone (10 channels) ──────────────────────────────────
-    _add("zone_rear", "hs_5a", "tail_light_left",    connected_loads=["tail_left", "brake_left"])
-    _add("zone_rear", "hs_5a", "tail_light_right",   connected_loads=["tail_right", "brake_right"])
-    _add("zone_rear", "hs_2a", "chmsl")              # center high-mount stop lamp
-    _add("zone_rear", "hs_2a", "license_plate_light")
-    _add("zone_rear", "hs_30a", "rear_defroster",    load_type="ptc")
-    _add("zone_rear", "hs_5a", "rear_wiper",         load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0)
-    _add("zone_rear", "ls_15a", "trunk_latch",       load_type="motor", inrush_factor=4.0, inrush_duration_ms=50.0)
-    _add("zone_rear", "hs_20a", "liftgate_motor",    load_type="motor", inrush_factor=6.0, inrush_duration_ms=80.0)
-    _add("zone_rear", "hs_2a", "parking_sensor_left")
-    _add("zone_rear", "hs_2a", "parking_sensor_right")
+    _add("zone_rear", "hs_5a", "tail_light_left",
+         connected_loads=["tail_left", "brake_left"],
+         system_cluster="exterior_lighting", system_name="rear_lighting",
+         pwm_capable=True, power_class="always_on")
+    _add("zone_rear", "hs_5a", "tail_light_right",
+         connected_loads=["tail_right", "brake_right"],
+         system_cluster="exterior_lighting", system_name="rear_lighting",
+         pwm_capable=True, power_class="always_on")
+    _add("zone_rear", "hs_2a", "chmsl",
+         system_cluster="exterior_lighting", system_name="rear_lighting",
+         power_class="always_on")
+    _add("zone_rear", "hs_2a", "license_plate_light",
+         system_cluster="exterior_lighting", system_name="rear_lighting")
+    _add("zone_rear", "hs_30a", "rear_defroster",    load_type="ptc",
+         system_cluster="body_comfort", system_name="climate",
+         pwm_capable=True)
+    _add("zone_rear", "hs_5a", "rear_wiper",         load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0,
+         system_cluster="driver_assist", system_name="wipers")
+    _add("zone_rear", "ls_15a", "trunk_latch",       load_type="motor", inrush_factor=4.0, inrush_duration_ms=50.0,
+         system_cluster="body_comfort", system_name="closure",
+         driver_type="low_side")
+    _add("zone_rear", "hs_20a", "liftgate_motor",    load_type="motor", inrush_factor=6.0, inrush_duration_ms=80.0,
+         system_cluster="body_comfort", system_name="closure",
+         driver_type="h_bridge")
+    _add("zone_rear", "hs_2a", "parking_sensor_left",
+         system_cluster="adas", system_name="parking",
+         load_type="capacitive")
+    _add("zone_rear", "hs_2a", "parking_sensor_right",
+         system_cluster="adas", system_name="parking",
+         load_type="capacitive")
 
     # ── Underhood zone (12 channels) ─────────────────────────────
-    _add("zone_underhood", "hs_50a", "engine_fan",      load_type="motor", inrush_factor=6.0, inrush_duration_ms=100.0)
-    _add("zone_underhood", "hs_30a", "fuel_pump",       load_type="motor", inrush_factor=4.0, inrush_duration_ms=60.0)
-    _add("zone_underhood", "hs_50a", "starter_relay",   load_type="inductive")
-    _add("zone_underhood", "hs_50a", "hvac_blower",     load_type="motor", inrush_factor=5.0, inrush_duration_ms=80.0)
+    _add("zone_underhood", "hs_50a", "engine_fan",      load_type="motor", inrush_factor=6.0, inrush_duration_ms=100.0,
+         system_cluster="powertrain", system_name="engine_cooling",
+         pwm_capable=True)
+    _add("zone_underhood", "hs_30a", "fuel_pump",       load_type="motor", inrush_factor=4.0, inrush_duration_ms=60.0,
+         system_cluster="powertrain", system_name="fuel_system",
+         pwm_capable=True)
+    _add("zone_underhood", "hs_50a", "starter_relay",   load_type="inductive",
+         system_cluster="powertrain", system_name="starting",
+         power_class="start")
+    _add("zone_underhood", "hs_50a", "hvac_blower",     load_type="motor", inrush_factor=5.0, inrush_duration_ms=80.0,
+         system_cluster="body_comfort", system_name="climate",
+         pwm_capable=True)
     _add("zone_underhood", "hs_20a", "hvac_compressor", load_type="motor", inrush_factor=4.0, inrush_duration_ms=60.0,
-         connected_loads=["ac_compressor_clutch"])
-    _add("zone_underhood", "hs_15a", "coolant_pump",    load_type="motor", inrush_factor=3.0, inrush_duration_ms=40.0)
-    _add("zone_underhood", "hs_10a", "throttle_body",   load_type="motor")
-    _add("zone_underhood", "hs_5a", "egr_valve",        load_type="inductive")
-    _add("zone_underhood", "hs_5a", "purge_valve",      load_type="inductive")
-    _add("zone_underhood", "hs_5a", "o2_sensor_heater_upstream", load_type="ptc")
-    _add("zone_underhood", "hs_5a", "o2_sensor_heater_downstream", load_type="ptc")
-    _add("zone_underhood", "hs_2a", "under_hood_light")
+         connected_loads=["ac_compressor_clutch"],
+         system_cluster="body_comfort", system_name="climate")
+    _add("zone_underhood", "hs_15a", "coolant_pump",    load_type="motor", inrush_factor=3.0, inrush_duration_ms=40.0,
+         system_cluster="powertrain", system_name="engine_cooling",
+         pwm_capable=True)
+    _add("zone_underhood", "hs_10a", "throttle_body",   load_type="motor",
+         system_cluster="powertrain", system_name="engine_control",
+         driver_type="h_bridge")
+    _add("zone_underhood", "hs_5a", "egr_valve",        load_type="inductive",
+         system_cluster="powertrain", system_name="emissions",
+         driver_type="half_bridge")
+    _add("zone_underhood", "hs_5a", "purge_valve",      load_type="inductive",
+         system_cluster="powertrain", system_name="emissions",
+         driver_type="half_bridge")
+    _add("zone_underhood", "hs_5a", "o2_sensor_heater_upstream", load_type="ptc",
+         system_cluster="powertrain", system_name="emissions",
+         pwm_capable=True)
+    _add("zone_underhood", "hs_5a", "o2_sensor_heater_downstream", load_type="ptc",
+         system_cluster="powertrain", system_name="emissions",
+         pwm_capable=True)
+    _add("zone_underhood", "hs_2a", "under_hood_light",
+         system_cluster="interior_lighting", system_name="utility_lights",
+         power_class="always_on")
 
     assert _ch == 52, f"Expected 52 channels, got {_ch}"
     return zones, specs

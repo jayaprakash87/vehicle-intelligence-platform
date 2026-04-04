@@ -13,8 +13,10 @@ from src.config.catalog import (
 from src.config.models import SimulationConfig, load_config
 from src.schemas.telemetry import (
     ChannelMeta,
+    DriverType,
     EFuseFamily,
     EFuseProfile,
+    PowerClass,
     SourceProtocol,
     ZoneController,
 )
@@ -246,6 +248,109 @@ class TestFleetScaleGeneration:
         telem_df, labels_df = gen.generate()
         assert len(labels_df) > 0
         assert set(labels_df["channel_id"].unique()) == {"ch_017", "ch_041"}
+
+
+# ---------------------------------------------------------------------------
+# IO attributes — system hierarchy, driver type, power class, PWM
+# ---------------------------------------------------------------------------
+
+class TestIOAttributes:
+    """Verify the sedan topology populates the new IO-level fields."""
+
+    def test_all_channels_have_system_cluster(self):
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        for ch in channels:
+            assert ch.system_cluster != "", f"{ch.channel_id} ({ch.load_name}) missing system_cluster"
+
+    def test_all_channels_have_system_name(self):
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        for ch in channels:
+            assert ch.system_name != "", f"{ch.channel_id} ({ch.load_name}) missing system_name"
+
+    def test_known_system_clusters(self):
+        """All clusters should be from a known set."""
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        clusters = {ch.system_cluster for ch in channels}
+        expected = {
+            "interior_lighting", "exterior_lighting", "body_comfort",
+            "driver_assist", "adas", "powertrain",
+        }
+        assert clusters == expected, f"Unexpected clusters: {clusters - expected}"
+
+    def test_always_on_channels(self):
+        """DRLs, tail lights, horn, etc. should be always_on (KL30)."""
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        always_on = [ch for ch in channels if ch.power_class == PowerClass.ALWAYS_ON]
+        always_on_names = {ch.load_name for ch in always_on}
+        # DRLs and tail lights are safety-critical = always on
+        assert "drl_left" in always_on_names
+        assert "tail_light_left" in always_on_names
+        assert "horn" in always_on_names
+
+    def test_starter_channel(self):
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        starter = [ch for ch in channels if ch.load_name == "starter_relay"]
+        assert len(starter) == 1
+        assert starter[0].power_class == PowerClass.START
+
+    def test_h_bridge_motors(self):
+        """Bidirectional motors (windows, mirrors, locks) should use H-bridge."""
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        windows = [ch for ch in channels if "window" in ch.load_name]
+        for ch in windows:
+            assert ch.driver_type == DriverType.H_BRIDGE, f"{ch.load_name} should be H-bridge"
+
+    def test_low_side_driver(self):
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        ls = [ch for ch in channels if ch.driver_type == DriverType.LOW_SIDE]
+        assert any(ch.load_name == "trunk_latch" for ch in ls)
+
+    def test_pwm_capable_lights(self):
+        """Dimmable lights should be PWM-capable."""
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        dome = [ch for ch in channels if ch.load_name == "dome_light"][0]
+        assert dome.pwm_capable is True
+        ambient = [ch for ch in channels if ch.load_name == "ambient_led_driver"][0]
+        assert ambient.pwm_capable is True
+
+    def test_non_pwm_defaults(self):
+        """Simple on/off loads shouldn't be PWM-capable."""
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        horn = [ch for ch in channels if ch.load_name == "horn"][0]
+        assert horn.pwm_capable is False
+
+    def test_capacitive_loads(self):
+        """ECU/sensor power supplies should be capacitive load type."""
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        adas = [ch for ch in channels if ch.load_name == "adas_camera_power"][0]
+        assert adas.load_type == "capacitive"
+        rain = [ch for ch in channels if ch.load_name == "rain_sensor"][0]
+        assert rain.load_type == "capacitive"
+
+    def test_default_driver_type_is_high_side(self):
+        """Most channels should default to high-side driver."""
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        hs_count = sum(1 for ch in channels if ch.driver_type == DriverType.HIGH_SIDE)
+        # Majority should be high-side (all except ~10 H-bridge/LS/half-bridge)
+        assert hs_count > 30
+
+    def test_default_power_class_is_ignition(self):
+        """Most channels should be ignition-switched (KL15)."""
+        zones, specs = sedan_topology()
+        channels = build_channels(zones, specs)
+        ign_count = sum(1 for ch in channels if ch.power_class == PowerClass.IGNITION)
+        assert ign_count > 35
 
 
 # ---------------------------------------------------------------------------
