@@ -16,8 +16,70 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from src.utils.logging import configure_logging, get_run_id
+
 app = typer.Typer(name="vip", help="Vehicle Intelligence Platform CLI")
-console = Console()
+console = Console(stderr=True)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _setup(
+    config: str,
+    output_dir: str | None = None,
+    fmt: str | None = None,
+    json_log: bool = False,
+):
+    """Common setup: configure logging, load config, stamp output dir with run ID."""
+    from src.config.models import load_config, default_config
+
+    run_id = configure_logging(json_format=json_log)
+
+    cfg_path = Path(config)
+    if not cfg_path.exists():
+        if config != "configs/default.yaml":
+            _abort(f"Config file not found: {config}")
+        cfg = default_config()
+    else:
+        try:
+            cfg = load_config(config)
+        except Exception as exc:
+            _abort(f"Failed to parse config '{config}': {exc}")
+
+    # Stamp output directory with run ID so runs never overwrite each other
+    if output_dir:
+        cfg.storage.output_dir = str(Path(output_dir) / run_id)
+    else:
+        cfg.storage.output_dir = str(Path(cfg.storage.output_dir) / run_id)
+    if fmt:
+        cfg.storage.format = fmt
+
+    Path(cfg.storage.output_dir).mkdir(parents=True, exist_ok=True)
+    console.print(f"[dim]run_id={run_id}  output={cfg.storage.output_dir}[/dim]")
+    return cfg
+
+
+def _load_data(data_path: str) -> "pd.DataFrame":
+    """Load telemetry from parquet or CSV with a clear error on missing file."""
+    import pandas as pd
+
+    p = Path(data_path)
+    if not p.exists():
+        _abort(f"Data file not found: {data_path}")
+    try:
+        if data_path.endswith(".parquet"):
+            return pd.read_parquet(data_path)
+        return pd.read_csv(data_path, parse_dates=["timestamp"])
+    except Exception as exc:
+        _abort(f"Failed to read '{data_path}': {exc}")
+
+
+def _abort(msg: str) -> None:
+    """Print a rich error and exit with code 1."""
+    console.print(f"[bold red]Error:[/bold red] {msg}")
+    raise typer.Exit(code=1)
 
 
 @app.command()
@@ -25,16 +87,14 @@ def simulate(
     config: str = typer.Option("configs/default.yaml", "--config", "-c", help="Config file path"),
     output_dir: str = typer.Option("output", "--output", "-o", help="Output directory"),
     fmt: str = typer.Option("parquet", "--format", "-f", help="Output format: parquet|csv|json"),
+    json_log: bool = typer.Option(False, "--json-log", help="Emit structured JSON logs"),
 ) -> None:
     """Generate synthetic eFuse telemetry data."""
-    from src.config.models import load_config, default_config
     from src.simulation.generator import TelemetryGenerator
     from src.ingestion.normalizer import Normalizer
-    from src.storage.writer import StorageWriter, StorageConfig
+    from src.storage.writer import StorageWriter
 
-    cfg = load_config(config) if Path(config).exists() else default_config()
-    cfg.storage.output_dir = output_dir
-    cfg.storage.format = fmt
+    cfg = _setup(config, output_dir, fmt, json_log)
 
     gen = TelemetryGenerator(cfg.simulation)
     telem_df, labels_df = gen.generate()
@@ -53,19 +113,14 @@ def simulate(
 def train(
     config: str = typer.Option("configs/default.yaml", "--config", "-c"),
     data_path: str = typer.Option("output/telemetry.parquet", "--data", "-d"),
+    json_log: bool = typer.Option(False, "--json-log", help="Emit structured JSON logs"),
 ) -> None:
     """Train the anomaly detection model on generated (or provided) telemetry."""
-    import pandas as pd
-    from src.config.models import load_config, default_config
     from src.features.engine import FeatureEngine
     from src.models.anomaly import AnomalyDetector
 
-    cfg = load_config(config) if Path(config).exists() else default_config()
-
-    if data_path.endswith(".parquet"):
-        df = pd.read_parquet(data_path)
-    else:
-        df = pd.read_csv(data_path, parse_dates=["timestamp"])
+    cfg = _setup(config, json_log=json_log)
+    df = _load_data(data_path)
 
     engine = FeatureEngine(cfg.features)
     feat_df = engine.compute(df)
@@ -83,22 +138,15 @@ def infer(
     data_path: str = typer.Option("output/telemetry.parquet", "--data", "-d"),
     output_dir: str = typer.Option("output", "--output", "-o"),
     fmt: str = typer.Option("parquet", "--format", "-f"),
+    json_log: bool = typer.Option(False, "--json-log", help="Emit structured JSON logs"),
 ) -> None:
     """Run inference on telemetry data (batch mode)."""
-    import pandas as pd
-    from src.config.models import load_config, default_config
     from src.inference.pipeline import InferencePipeline
     from src.models.anomaly import AnomalyDetector
     from src.storage.writer import StorageWriter
 
-    cfg = load_config(config) if Path(config).exists() else default_config()
-    cfg.storage.output_dir = output_dir
-    cfg.storage.format = fmt
-
-    if data_path.endswith(".parquet"):
-        df = pd.read_parquet(data_path)
-    else:
-        df = pd.read_csv(data_path, parse_dates=["timestamp"])
+    cfg = _setup(config, output_dir, fmt, json_log)
+    df = _load_data(data_path)
 
     # Load trained model if available
     detector = AnomalyDetector(cfg.model)
@@ -125,23 +173,17 @@ def edge(
     data_path: str = typer.Option("output/telemetry.parquet", "--data", "-d"),
     output_dir: str = typer.Option("output", "--output", "-o"),
     max_iter: int = typer.Option(0, "--max-iter", help="Max batches (0=unlimited)"),
+    json_log: bool = typer.Option(False, "--json-log", help="Emit structured JSON logs"),
 ) -> None:
     """Run the edge runtime loop over telemetry data."""
-    import pandas as pd
-    from src.config.models import load_config, default_config
     from src.edge.runtime import EdgeRuntime
     from src.inference.pipeline import InferencePipeline
     from src.models.anomaly import AnomalyDetector
     from src.storage.writer import StorageWriter
     from src.transport.mock_can import DataFrameTransport
 
-    cfg = load_config(config) if Path(config).exists() else default_config()
-    cfg.storage.output_dir = output_dir
-
-    if data_path.endswith(".parquet"):
-        df = pd.read_parquet(data_path)
-    else:
-        df = pd.read_csv(data_path, parse_dates=["timestamp"])
+    cfg = _setup(config, output_dir, json_log=json_log)
+    df = _load_data(data_path)
 
     detector = AnomalyDetector(cfg.model)
     model_file = Path(cfg.model.model_dir) / "anomaly_detector.joblib"
@@ -168,10 +210,9 @@ def pipeline(
     config: str = typer.Option("configs/default.yaml", "--config", "-c"),
     output_dir: str = typer.Option("output", "--output", "-o"),
     fmt: str = typer.Option("parquet", "--format", "-f"),
+    json_log: bool = typer.Option(False, "--json-log", help="Emit structured JSON logs"),
 ) -> None:
     """Full pipeline: simulate → train → infer — one command demo."""
-    import pandas as pd
-    from src.config.models import load_config, default_config
     from src.simulation.generator import TelemetryGenerator
     from src.ingestion.normalizer import Normalizer
     from src.features.engine import FeatureEngine
@@ -179,9 +220,7 @@ def pipeline(
     from src.inference.pipeline import InferencePipeline
     from src.storage.writer import StorageWriter
 
-    cfg = load_config(config) if Path(config).exists() else default_config()
-    cfg.storage.output_dir = output_dir
-    cfg.storage.format = fmt
+    cfg = _setup(config, output_dir, fmt, json_log)
 
     console.rule("[bold blue]1. Simulate")
     gen = TelemetryGenerator(cfg.simulation)
@@ -211,7 +250,7 @@ def pipeline(
     writer.write_telemetry(telem_df)
     writer.write_labels(labels_df)
     writer.write_scored(scored)
-    console.print(f"  Output written to {output_dir}/")
+    console.print(f"  Output written to {cfg.storage.output_dir}/")
 
     console.rule("[bold blue]Summary")
     _print_summary(scored)
