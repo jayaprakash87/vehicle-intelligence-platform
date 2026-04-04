@@ -277,5 +277,17 @@ def _print_summary(scored: "pd.DataFrame") -> None:
     console.print(table)
 
 
+@app.command()
+def dashboard() -> None:
+    """Launch the Streamlit monitoring dashboard."""
+    import subprocess
+    import sys
+
+    app_path = Path(__file__).parent / "dashboard" / "app.py"
+    if not app_path.exists():
+        _abort(f"Dashboard app not found at {app_path}")
+    subprocess.run([sys.executable, "-m", "streamlit", "run", str(app_path)], check=False)
+
+
 if __name__ == "__main__":
     app()

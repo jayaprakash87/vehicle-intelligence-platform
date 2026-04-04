@@ -22,6 +22,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dashboard = [
+    "streamlit>=1.30",
+    "plotly>=5.18",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov",
