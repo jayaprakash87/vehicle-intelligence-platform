@@ -3,7 +3,7 @@
 import pandas as pd
 
 from src.config.models import SimulationConfig
-from src.schemas.telemetry import ChannelMeta, FaultInjection, FaultType
+from src.schemas.telemetry import ChannelMeta, FaultInjection, FaultType, ProtectionEvent
 from src.simulation.generator import TelemetryGenerator
 
 
@@ -150,6 +150,53 @@ def test_fit_protection_trips_on_overload():
     # After max retries, channel should latch off (current near zero)
     tripped_rows = df[df["trip_flag"]]
     assert (tripped_rows["current_a"].abs() < 1.0).any(), "Latch-off should have near-zero current"
+
+
+def test_protection_event_tagged_on_overload():
+    """protection_event column should carry SCP/I2T/LATCH_OFF, not just 'none'."""
+    ch = ChannelMeta(
+        channel_id="ch_01",
+        load_name="test",
+        nominal_current_a=5.0,
+        max_current_a=20.0,
+        fuse_rating_a=15.0,
+        cooldown_s=0.5,
+        max_retries=2,
+    )
+    cfg = _make_config(
+        channels=[ch],
+        duration_s=10.0,
+        sample_interval_ms=50.0,
+        fault_injections=[
+            FaultInjection(
+                channel_id="ch_01",
+                fault_type=FaultType.OVERLOAD_SPIKE,
+                start_s=2.0,
+                duration_s=4.0,
+                intensity=0.9,
+            )
+        ],
+    )
+    gen = TelemetryGenerator(cfg)
+    df, labels = gen.generate()
+
+    assert "protection_event" in df.columns, "DataFrame must include protection_event"
+    events = set(df["protection_event"].unique())
+    # Should have at least 'none' and one of the trip types
+    assert ProtectionEvent.NONE.value in events
+    non_none = events - {ProtectionEvent.NONE.value}
+    assert len(non_none) > 0, "Overload should produce at least one protection event"
+    # All non-none events should be valid ProtectionEvent values
+    valid_values = {e.value for e in ProtectionEvent}
+    assert non_none <= valid_values, f"Unexpected protection events: {non_none - valid_values}"
+
+
+def test_nominal_has_no_protection_events():
+    """Nominal scenario should have protection_event = 'none' everywhere."""
+    cfg = _make_config()
+    gen = TelemetryGenerator(cfg)
+    df, _ = gen.generate()
+    assert (df["protection_event"] == ProtectionEvent.NONE.value).all()
 
 
 def test_catalog_propagates_dual_adc():

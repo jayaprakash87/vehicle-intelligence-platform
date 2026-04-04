@@ -23,6 +23,7 @@ from src.schemas.telemetry import (
     DeviceStatus,
     FaultInjection,
     FaultType,
+    ProtectionEvent,
 )
 from src.utils.logging import get_logger
 
@@ -247,6 +248,7 @@ class TelemetryGenerator:
         current: np.ndarray,
         state: np.ndarray,
         trip: np.ndarray,
+        protection_event: np.ndarray,
         reset_counter: np.ndarray,
         ch: ChannelMeta,
         fault_start: int,
@@ -263,7 +265,9 @@ class TelemetryGenerator:
              sustained overloads.
 
         After trip: channel off → cooldown → retry → latch-off if max retries
-        exceeded.  Mutates arrays in-place.
+        exceeded.  Tags each sample's protection_event with the specific
+        mechanism that fired (SCP, I2T, or LATCH_OFF).
+        Mutates arrays in-place.
         """
         # Resolve auto thresholds (0 means "derive from profile")
         fit_thresh = ch.fit_threshold_a2s
@@ -281,7 +285,7 @@ class TelemetryGenerator:
 
         while i < fault_end and retries_done <= ch.max_retries:
             # Scan forward looking for a trip condition
-            tripped = False
+            trip_reason = ProtectionEvent.NONE
             scan_end = min(fault_end, i + cooldown_samples * 10)  # bounded scan
             for j in range(i, scan_end):
                 i_abs = abs(current[j])
@@ -289,7 +293,7 @@ class TelemetryGenerator:
                 # Fast SCP — immediate trip
                 if i_abs >= scp_thresh:
                     i = j
-                    tripped = True
+                    trip_reason = ProtectionEvent.SCP
                     break
 
                 # F(i,t) energy integration (only when above nominal)
@@ -301,10 +305,10 @@ class TelemetryGenerator:
 
                 if energy >= fit_thresh:
                     i = j
-                    tripped = True
+                    trip_reason = ProtectionEvent.I2T
                     break
 
-            if not tripped:
+            if trip_reason == ProtectionEvent.NONE:
                 break  # fault current not high enough to trip
 
             # --- Trip event ---
@@ -313,22 +317,25 @@ class TelemetryGenerator:
             cooldown_end = min(i + cooldown_samples, fault_end)
             current[i:cooldown_end] = self.rng.normal(0.001, 0.0005, cooldown_end - i)
             state[i:cooldown_end] = False
+            protection_event[i:cooldown_end] = trip_reason.value
 
             retries_done += 1
             reset_counter[cooldown_end:fault_end] = retries_done
             energy = 0.0  # reset accumulator after trip+cooldown
 
-            # After cooldown, retry
+            # After cooldown, retry (auto-restart)
             i = cooldown_end
             if i < fault_end:
                 state[i:fault_end] = True
                 trip[i:fault_end] = False
+                protection_event[i:fault_end] = ProtectionEvent.NONE.value
 
         # If max retries exhausted, latch off for remainder
         if retries_done > ch.max_retries and i < fault_end:
             current[i:fault_end] = self.rng.normal(0.0, 0.0005, fault_end - i)
             state[i:fault_end] = False
             trip[i:fault_end] = True
+            protection_event[i:fault_end] = ProtectionEvent.LATCH_OFF.value
 
     # ------------------------------------------------------------------
     # Per-channel generation
@@ -358,6 +365,7 @@ class TelemetryGenerator:
         state = np.ones(n, dtype=bool)
         trip = np.zeros(n, dtype=bool)
         overload = np.zeros(n, dtype=bool)
+        protection_event = np.full(n, ProtectionEvent.NONE.value, dtype=object)
         reset_counter = np.zeros(n, dtype=int)
         pwm = np.full(n, 100.0)
         status = np.full(n, DeviceStatus.OK.value, dtype=object)
@@ -383,7 +391,7 @@ class TelemetryGenerator:
                     overload[sl] = True
                     status[sl] = DeviceStatus.FAULT.value
                     # Protection response: trip → off → cooldown → retry
-                    self._apply_protection(current, state, trip, reset_counter, ch, start_idx, end_idx, interval_s)
+                    self._apply_protection(current, state, trip, protection_event, reset_counter, ch, start_idx, end_idx, interval_s)
 
                 case FaultType.INTERMITTENT_OVERLOAD:
                     # Damped oscillation — repeated overcurrent bursts
@@ -479,6 +487,7 @@ class TelemetryGenerator:
             "state_on_off": state,
             "trip_flag": trip,
             "overload_flag": overload,
+            "protection_event": protection_event,
             "reset_counter": cum_resets,
             "pwm_duty_pct": pwm,
             "device_status": status,

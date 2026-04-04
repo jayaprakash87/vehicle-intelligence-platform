@@ -40,6 +40,22 @@ class DeviceStatus(str, Enum):
     UNKNOWN = "unknown"
 
 
+class ProtectionEvent(str, Enum):
+    """Protection mechanism reported by the eFuse IC / CDD.
+
+    Real eFuse ICs expose a status register that tells the CDD exactly
+    which protection mechanism fired. This information is essential for
+    fault classification — the same trip_flag=True has very different
+    implications depending on whether it was a 10µs short-circuit
+    comparator or a slow I²t energy integral.
+    """
+    NONE = "none"                        # No protection event active
+    SCP = "scp"                          # Short-circuit protection (instantaneous comparator)
+    I2T = "i2t"                          # I²t / F(i,t) energy-integral overcurrent trip
+    THERMAL_SHUTDOWN = "thermal_shutdown" # Junction temperature exceeded limit
+    LATCH_OFF = "latch_off"              # Max retries exhausted — channel locked off
+
+
 class FaultType(str, Enum):
     NONE = "none"
     OVERLOAD_SPIKE = "overload_spike"
@@ -209,6 +225,10 @@ class TelemetryRecord(BaseModel):
     state_on_off: bool = Field(description="Channel power state")
     trip_flag: bool = Field(default=False, description="Over-current trip active")
     overload_flag: bool = Field(default=False, description="Overload condition detected")
+    protection_event: ProtectionEvent = Field(
+        default=ProtectionEvent.NONE,
+        description="Which protection mechanism fired (SCP, I²t, thermal, latch-off)",
+    )
     reset_counter: int = Field(default=0, ge=0, description="Cumulative reset count")
     pwm_duty_pct: float = Field(default=100.0, ge=0.0, le=100.0, description="PWM duty %")
     device_status: DeviceStatus = DeviceStatus.OK

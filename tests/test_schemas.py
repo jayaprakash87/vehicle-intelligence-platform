@@ -12,6 +12,7 @@ from src.schemas.telemetry import (
     FaultInjection,
     FaultType,
     InferenceResult,
+    ProtectionEvent,
     SafetyLevel,
     TelemetryRecord,
 )
@@ -28,6 +29,7 @@ def test_telemetry_record_defaults():
     )
     assert rec.trip_flag is False
     assert rec.overload_flag is False
+    assert rec.protection_event == ProtectionEvent.NONE
     assert rec.reset_counter == 0
     assert rec.pwm_duty_pct == 100.0
     assert rec.device_status == DeviceStatus.OK
@@ -151,3 +153,30 @@ def test_channel_meta_defaults_zero_protection():
     ch = ChannelMeta(channel_id="ch_001")
     assert ch.fit_threshold_a2s == 0.0
     assert ch.short_circuit_threshold_a == 0.0
+
+
+# ---------------------------------------------------------------------------
+# ProtectionEvent enum
+# ---------------------------------------------------------------------------
+
+def test_protection_event_enum_values():
+    assert ProtectionEvent.NONE.value == "none"
+    assert ProtectionEvent.SCP.value == "scp"
+    assert ProtectionEvent.I2T.value == "i2t"
+    assert ProtectionEvent.THERMAL_SHUTDOWN.value == "thermal_shutdown"
+    assert ProtectionEvent.LATCH_OFF.value == "latch_off"
+
+
+def test_telemetry_record_with_protection_event():
+    rec = TelemetryRecord(
+        timestamp=datetime.now(tz=timezone.utc),
+        channel_id="ch_01",
+        current_a=0.001,
+        voltage_v=0.0,
+        temperature_c=85.0,
+        state_on_off=False,
+        trip_flag=True,
+        protection_event=ProtectionEvent.SCP,
+    )
+    assert rec.protection_event == ProtectionEvent.SCP
+    assert rec.trip_flag is True
