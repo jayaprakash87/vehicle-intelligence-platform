@@ -1,0 +1,62 @@
+# Stress test: all fault types on a single channel
+
+simulation:
+  scenario_id: all_faults_single_channel
+  name: "All Faults - Single Channel"
+  description: "Every fault type injected sequentially on one channel"
+  duration_s: 120.0
+  sample_interval_ms: 100.0
+  seed: 123
+  channels:
+    - channel_id: ch_stress
+      load_name: stress_test_load
+      nominal_current_a: 8.0
+      max_current_a: 20.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 15.0
+      load_type: motor
+      r_ds_on_ohm: 0.012
+      r_thermal_kw: 50.0
+      tau_thermal_s: 12.0
+      t_ambient_c: 30.0
+      adc_bits: 10
+      pink_noise_alpha: 1.2
+      emi_amplitude_a: 0.08
+      cooldown_s: 0.5
+      max_retries: 3
+  fault_injections:
+    - channel_id: ch_stress
+      fault_type: overload_spike
+      start_s: 5.0
+      duration_s: 3.0
+      intensity: 0.9
+    - channel_id: ch_stress
+      fault_type: intermittent_overload
+      start_s: 15.0
+      duration_s: 10.0
+      intensity: 0.6
+    - channel_id: ch_stress
+      fault_type: voltage_sag
+      start_s: 30.0
+      duration_s: 8.0
+      intensity: 0.7
+    - channel_id: ch_stress
+      fault_type: thermal_drift
+      start_s: 45.0
+      duration_s: 15.0
+      intensity: 0.8
+    - channel_id: ch_stress
+      fault_type: noisy_sensor
+      start_s: 65.0
+      duration_s: 10.0
+      intensity: 0.5
+    - channel_id: ch_stress
+      fault_type: dropped_packet
+      start_s: 80.0
+      duration_s: 8.0
+      intensity: 0.4
+    - channel_id: ch_stress
+      fault_type: gradual_degradation
+      start_s: 95.0
+      duration_s: 20.0
+      intensity: 0.7

@@ -1,0 +1,29 @@
+# Clean scenario with no fault injections — for baseline training
+
+simulation:
+  scenario_id: nominal_baseline
+  name: "Nominal Baseline"
+  description: "All channels running nominally — no faults"
+  duration_s: 120.0
+  sample_interval_ms: 100.0
+  seed: 99
+  channels:
+    - channel_id: ch_01
+      load_name: headlamp_left
+      nominal_current_a: 6.0
+      max_current_a: 15.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 10.0
+    - channel_id: ch_02
+      load_name: rear_defroster
+      nominal_current_a: 12.0
+      max_current_a: 25.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 20.0
+    - channel_id: ch_03
+      load_name: seat_heater
+      nominal_current_a: 8.0
+      max_current_a: 18.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 15.0
+  fault_injections: []

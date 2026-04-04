@@ -1,0 +1,83 @@
+# Default scenario configuration
+# Simulates 3 eFuse channels over 60 seconds with mixed fault injections
+
+simulation:
+  scenario_id: demo_mixed_faults
+  name: "Mixed Fault Demo"
+  description: "Three channels with different fault injections for demonstration"
+  duration_s: 60.0
+  sample_interval_ms: 100.0
+  seed: 42
+  channels:
+    - channel_id: ch_01
+      load_name: headlamp_left
+      nominal_current_a: 6.0
+      max_current_a: 15.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 10.0
+      load_type: resistive
+      r_ds_on_ohm: 0.008
+      r_thermal_kw: 35.0
+      tau_thermal_s: 20.0
+    - channel_id: ch_02
+      load_name: rear_defroster
+      nominal_current_a: 12.0
+      max_current_a: 25.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 20.0
+      load_type: ptc
+      r_ds_on_ohm: 0.015
+      r_thermal_kw: 45.0
+      tau_thermal_s: 10.0
+    - channel_id: ch_03
+      load_name: seat_heater
+      nominal_current_a: 8.0
+      max_current_a: 18.0
+      nominal_voltage_v: 13.5
+      fuse_rating_a: 15.0
+      load_type: resistive
+      r_ds_on_ohm: 0.010
+      r_thermal_kw: 40.0
+      tau_thermal_s: 15.0
+  fault_injections:
+    # Overload spike on headlamp at t=15s
+    - channel_id: ch_01
+      fault_type: overload_spike
+      start_s: 15.0
+      duration_s: 3.0
+      intensity: 0.8
+    # Thermal drift on defroster at t=20s
+    - channel_id: ch_02
+      fault_type: thermal_drift
+      start_s: 20.0
+      duration_s: 15.0
+      intensity: 0.6
+    # Gradual degradation on seat heater at t=10s
+    - channel_id: ch_03
+      fault_type: gradual_degradation
+      start_s: 10.0
+      duration_s: 30.0
+      intensity: 0.5
+    # Voltage sag across ch_01 at t=40s
+    - channel_id: ch_01
+      fault_type: voltage_sag
+      start_s: 40.0
+      duration_s: 8.0
+      intensity: 0.7
+
+features:
+  window_size: 50
+  min_periods: 10
+
+model:
+  anomaly_contamination: auto
+  anomaly_n_estimators: 100
+  model_dir: artifacts/models
+
+storage:
+  output_dir: output
+  format: parquet
+
+edge:
+  batch_size: 50
+  alert_anomaly_threshold: 0.6
