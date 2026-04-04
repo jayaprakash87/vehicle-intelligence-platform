@@ -17,10 +17,8 @@ from __future__ import annotations
 
 from src.schemas.telemetry import (
     ChannelMeta,
-    DriverType,
     EFuseFamily,
     EFuseProfile,
-    PowerClass,
     SafetyLevel,
     SourceProtocol,
     ZoneController,
@@ -40,14 +38,13 @@ from src.schemas.telemetry import (
 #   - r_ds_on falls with higher current ratings (bigger die / parallel FETs)
 #   - r_thermal_kw in °C/W (junction-to-ambient, with PCB copper)
 #   - tau_thermal_s = R_th × C_th time constant
-#   - channels_per_ic > 1 means shared thermal mass (multi-channel ICs)
+#   - Multi-channel ICs (e.g. TLE92104 4ch) share thermal mass on the die
 
 EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
     # --- BTS7006-1EPP: Infineon PROFET+2, 1ch high-side, ~2.5A class -------
     EFuseFamily.HS_2A: EFuseProfile(
         efuse_family=EFuseFamily.HS_2A,
         ic_part_number="BTS7006-1EPP", manufacturer="Infineon",
-        channels_per_ic=1, driver_type=DriverType.HIGH_SIDE,
         nominal_current_a=1.5, max_current_a=3.0, fuse_rating_a=2.5,
         r_ds_on_ohm=0.180, r_thermal_kw=80.0, tau_thermal_s=8.0,
         cooldown_s=0.5, max_retries=5, current_adc_bits=12, load_type="resistive",
@@ -56,7 +53,6 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
     EFuseFamily.HS_5A: EFuseProfile(
         efuse_family=EFuseFamily.HS_5A,
         ic_part_number="VN7140AS", manufacturer="STMicroelectronics",
-        channels_per_ic=1, driver_type=DriverType.HIGH_SIDE,
         nominal_current_a=3.5, max_current_a=7.0, fuse_rating_a=5.0,
         r_ds_on_ohm=0.060, r_thermal_kw=55.0, tau_thermal_s=12.0,
         cooldown_s=0.5, max_retries=4, current_adc_bits=12, load_type="resistive",
@@ -65,7 +61,6 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
     EFuseFamily.HS_10A: EFuseProfile(
         efuse_family=EFuseFamily.HS_10A,
         ic_part_number="TLE92104", manufacturer="Infineon",
-        channels_per_ic=4, driver_type=DriverType.HIGH_SIDE,
         nominal_current_a=6.0, max_current_a=15.0, fuse_rating_a=10.0,
         r_ds_on_ohm=0.025, r_thermal_kw=40.0, tau_thermal_s=15.0,
         cooldown_s=1.0, max_retries=3, current_adc_bits=12, load_type="resistive",
@@ -75,7 +70,6 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
     EFuseFamily.HS_15A: EFuseProfile(
         efuse_family=EFuseFamily.HS_15A,
         ic_part_number="VND7140AJ", manufacturer="STMicroelectronics",
-        channels_per_ic=2, driver_type=DriverType.HIGH_SIDE,
         nominal_current_a=10.0, max_current_a=20.0, fuse_rating_a=15.0,
         r_ds_on_ohm=0.012, r_thermal_kw=35.0, tau_thermal_s=18.0,
         cooldown_s=1.0, max_retries=3, current_adc_bits=12, load_type="resistive",
@@ -84,7 +78,6 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
     EFuseFamily.HS_20A: EFuseProfile(
         efuse_family=EFuseFamily.HS_20A,
         ic_part_number="BTS7004-1EPP", manufacturer="Infineon",
-        channels_per_ic=1, driver_type=DriverType.HIGH_SIDE,
         nominal_current_a=14.0, max_current_a=28.0, fuse_rating_a=20.0,
         r_ds_on_ohm=0.008, r_thermal_kw=30.0, tau_thermal_s=20.0,
         cooldown_s=1.5, max_retries=3, current_adc_bits=14, load_type="resistive",
@@ -93,7 +86,6 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
     EFuseFamily.HS_30A: EFuseProfile(
         efuse_family=EFuseFamily.HS_30A,
         ic_part_number="VN9xE30F", manufacturer="STMicroelectronics",
-        channels_per_ic=1, driver_type=DriverType.HIGH_SIDE,
         nominal_current_a=20.0, max_current_a=40.0, fuse_rating_a=30.0,
         r_ds_on_ohm=0.005, r_thermal_kw=25.0, tau_thermal_s=22.0,
         cooldown_s=2.0, max_retries=2, current_adc_bits=12, load_type="resistive",
@@ -102,7 +94,6 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
     EFuseFamily.HS_50A: EFuseProfile(
         efuse_family=EFuseFamily.HS_50A,
         ic_part_number="BTS81000-SSGI", manufacturer="Infineon",
-        channels_per_ic=1, driver_type=DriverType.HIGH_SIDE,
         nominal_current_a=35.0, max_current_a=65.0, fuse_rating_a=50.0,
         r_ds_on_ohm=0.003, r_thermal_kw=18.0, tau_thermal_s=30.0,
         cooldown_s=3.0, max_retries=2, current_adc_bits=10, load_type="resistive",
@@ -112,7 +103,6 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
     EFuseFamily.LS_5A: EFuseProfile(
         efuse_family=EFuseFamily.LS_5A,
         ic_part_number="TLE92104", manufacturer="Infineon",
-        channels_per_ic=4, driver_type=DriverType.LOW_SIDE,
         nominal_current_a=3.0, max_current_a=7.0, fuse_rating_a=5.0,
         r_ds_on_ohm=0.070, r_thermal_kw=60.0, tau_thermal_s=10.0,
         cooldown_s=0.5, max_retries=4, current_adc_bits=12, load_type="resistive",
@@ -121,7 +111,6 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
     EFuseFamily.LS_15A: EFuseProfile(
         efuse_family=EFuseFamily.LS_15A,
         ic_part_number="VNH9045", manufacturer="STMicroelectronics",
-        channels_per_ic=1, driver_type=DriverType.H_BRIDGE,
         nominal_current_a=10.0, max_current_a=20.0, fuse_rating_a=15.0,
         r_ds_on_ohm=0.015, r_thermal_kw=35.0, tau_thermal_s=15.0,
         cooldown_s=1.0, max_retries=3, current_adc_bits=12, load_type="resistive",

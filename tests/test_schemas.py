@@ -111,16 +111,6 @@ def test_efuse_profile_explicit_fit_threshold():
     assert p.short_circuit_threshold_a == 120.0
 
 
-def test_efuse_profile_supply_voltage_defaults():
-    p = EFuseProfile(
-        efuse_family=EFuseFamily.HS_5A,
-        nominal_current_a=3.5, max_current_a=7.0, fuse_rating_a=5.0,
-        r_ds_on_ohm=0.060, r_thermal_kw=55.0, tau_thermal_s=12.0,
-    )
-    assert p.supply_voltage_min_v == 5.5
-    assert p.supply_voltage_max_v == 30.0
-
-
 def test_efuse_profile_safety_level():
     p = EFuseProfile(
         efuse_family=EFuseFamily.HS_50A,

@@ -1,6 +1,21 @@
-"""Canonical telemetry and metadata schemas for the Vehicle Intelligence Platform.
+"""Telemetry schemas for the Vehicle Intelligence Platform.
 
-All data flowing through the system conforms to these Pydantic models.
+This product detects and predicts eFuse faults in automotive electrical
+systems by analysing current, voltage, and temperature telemetry from
+Zone Controllers.
+
+Data flows through three stages, each with a dedicated schema:
+
+    TelemetryRecord  →  DerivedFeatures  →  InferenceResult
+     (raw samples)      (rolling stats)     (fault verdict)
+
+Supporting schemas:
+  ChannelMeta      Per-channel static config (load profile, IC thresholds)
+  EFuseProfile     IC-family electrical template (catalog look-up)
+  ZoneController   Physical ECU hosting the eFuse ICs
+  FaultInjection   Fault definition for simulation scenarios
+  EventLabel       Ground-truth label for supervised evaluation
+
 Validation happens at system boundaries (ingestion, inference output).
 Internal hot-path code uses dicts/DataFrames for speed.
 """
@@ -103,9 +118,9 @@ class PowerClass(str, Enum):
 class EFuseProfile(BaseModel):
     """Electrical + thermal template for an eFuse IC family.
 
-    Captures the parameters that actually matter for telemetry simulation
-    and anomaly detection — measurement resolution, protection thresholds,
-    and supply voltage envelope.
+    Captures the parameters that shape telemetry simulation and anomaly
+    detection: current ratings, thermal model, ADC resolution, and
+    protection thresholds.
 
     Each profile represents a specific IC or IC family (e.g. Infineon
     BTS7006-1EPP, ST VND7140AJ).  The optional identification fields
@@ -125,14 +140,6 @@ class EFuseProfile(BaseModel):
     # --- IC identification (optional — for traceability to real datasheets) ---
     ic_part_number: str = Field(default="", description="IC part number, e.g. 'BTS7006-1EPP'")
     manufacturer: str = Field(default="", description="IC vendor, e.g. 'Infineon', 'STMicroelectronics'")
-    channels_per_ic: int = Field(
-        default=1,
-        description="Output channels per physical IC package (e.g. 2 for VND7140AJ dual, 4 for TLE92104)",
-    )
-    driver_type: DriverType = Field(
-        default=DriverType.HIGH_SIDE,
-        description="Switch topology — high-side, low-side, H-bridge, half-bridge",
-    )
 
     # --- ADC sensing ---
     current_adc_bits: int = Field(default=12, description="Current-sense ADC resolution (varies by IC: 10-16 bit)")
@@ -150,10 +157,6 @@ class EFuseProfile(BaseModel):
         default=0.0,
         description="Instantaneous short-circuit trip (A).  0 = auto as 3× max_current_a",
     )
-
-    # --- Supply voltage envelope ---
-    supply_voltage_min_v: float = Field(default=5.5, description="Min supply for rated performance (V)")
-    supply_voltage_max_v: float = Field(default=30.0, description="Max supply for rated performance (V)")
 
     # --- Safety classification ---
     safety_level: SafetyLevel = Field(default=SafetyLevel.QM, description="ISO 26262 classification")
