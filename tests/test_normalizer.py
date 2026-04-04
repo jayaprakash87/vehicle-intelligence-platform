@@ -9,19 +9,21 @@ from src.ingestion.normalizer import Normalizer
 
 def _make_raw(n: int = 100, channel_id: str = "ch_01") -> pd.DataFrame:
     t0 = datetime.now(tz=timezone.utc)
-    return pd.DataFrame({
-        "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
-        "channel_id": channel_id,
-        "current_a": np.random.default_rng(42).normal(5.0, 0.2, n),
-        "voltage_v": np.random.default_rng(42).normal(13.5, 0.05, n),
-        "temperature_c": 25.0 + np.random.default_rng(42).normal(0, 0.5, n),
-        "state_on_off": True,
-        "trip_flag": False,
-        "overload_flag": False,
-        "reset_counter": 0,
-        "pwm_duty_pct": 100.0,
-        "device_status": "ok",
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
+            "channel_id": channel_id,
+            "current_a": np.random.default_rng(42).normal(5.0, 0.2, n),
+            "voltage_v": np.random.default_rng(42).normal(13.5, 0.05, n),
+            "temperature_c": 25.0 + np.random.default_rng(42).normal(0, 0.5, n),
+            "state_on_off": True,
+            "trip_flag": False,
+            "overload_flag": False,
+            "reset_counter": 0,
+            "pwm_duty_pct": 100.0,
+            "device_status": "ok",
+        }
+    )
 
 
 def test_normalize_sorts_by_timestamp():

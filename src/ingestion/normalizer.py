@@ -52,10 +52,7 @@ class Normalizer:
                 mask = df["channel_id"] == ch_id
                 win = max(int(self.cfg.missing_rate_window_s / interval_s), 1)
                 df.loc[mask, "missing_rate"] = (
-                    df.loc[mask, "_is_missing"]
-                    .rolling(win, min_periods=1)
-                    .mean()
-                    .values
+                    df.loc[mask, "_is_missing"].rolling(win, min_periods=1).mean().values
                 )
             if "missing_rate" not in df.columns:
                 df["missing_rate"] = 0.0
@@ -157,6 +154,8 @@ class Normalizer:
         result.reset_index(drop=True, inplace=True)
         log.info(
             "Resampled %d rows to %dms grid → %d rows",
-            len(df), int(target_ms), len(result),
+            len(df),
+            int(target_ms),
+            len(result),
         )
         return result

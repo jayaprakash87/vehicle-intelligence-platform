@@ -139,13 +139,16 @@ class AnomalyDetector:
         self._prepare_mask = valid_mask  # stash for callers that need row alignment
         X = subset[valid_mask].values
         if len(X) == 0:
-            raise ValueError("No valid rows after dropping NaN features (cold-start window too large)")
+            raise ValueError(
+                "No valid rows after dropping NaN features (cold-start window too large)"
+            )
         return X
 
 
 # ---------------------------------------------------------------------------
 # Rules-based fault classifier
 # ---------------------------------------------------------------------------
+
 
 class RulesFaultClassifier:
     """Interpretable rules that map feature patterns to known fault types.

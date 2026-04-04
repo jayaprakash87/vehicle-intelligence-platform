@@ -52,7 +52,8 @@ class InferencePipeline:
 
         log.info(
             "Inference complete: %d rows, %d anomalies detected",
-            len(feat_df), feat_df["is_anomaly"].sum(),
+            len(feat_df),
+            feat_df["is_anomaly"].sum(),
         )
         return feat_df
 
@@ -79,16 +80,18 @@ class InferencePipeline:
 
             action = _recommend_action(fault, row.get("anomaly_score", 0))
 
-            results.append(InferenceResult(
-                timestamp=row["timestamp"],
-                channel_id=row["channel_id"],
-                is_anomaly=bool(row.get("is_anomaly", False)),
-                anomaly_score=float(row.get("anomaly_score", 0)),
-                predicted_fault=fault,
-                fault_confidence=float(row.get("fault_confidence", 0)),
-                likely_causes=row.get("likely_causes", []),
-                recommended_action=action,
-            ))
+            results.append(
+                InferenceResult(
+                    timestamp=row["timestamp"],
+                    channel_id=row["channel_id"],
+                    is_anomaly=bool(row.get("is_anomaly", False)),
+                    anomaly_score=float(row.get("anomaly_score", 0)),
+                    predicted_fault=fault,
+                    fault_confidence=float(row.get("fault_confidence", 0)),
+                    likely_causes=row.get("likely_causes", []),
+                    recommended_action=action,
+                )
+            )
         return results
 
 

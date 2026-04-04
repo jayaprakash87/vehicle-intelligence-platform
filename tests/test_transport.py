@@ -9,12 +9,14 @@ from src.transport.mock_can import DataFrameTransport, ReplayTransport
 
 def _make_df(n: int = 100) -> pd.DataFrame:
     t0 = datetime.now(tz=timezone.utc)
-    return pd.DataFrame({
-        "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
-        "channel_id": "ch_01",
-        "current_a": np.random.default_rng(42).normal(5.0, 0.2, n),
-        "voltage_v": 13.5,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
+            "channel_id": "ch_01",
+            "current_a": np.random.default_rng(42).normal(5.0, 0.2, n),
+            "voltage_v": 13.5,
+        }
+    )
 
 
 def test_batch_returns_correct_size():

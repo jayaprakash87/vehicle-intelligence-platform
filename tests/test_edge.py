@@ -17,18 +17,20 @@ def _make_telemetry(n: int, nominal_current: float = 5.0, seed: int = 42) -> pd.
     """Build a simple telemetry DataFrame with n rows, single channel."""
     rng = np.random.default_rng(seed)
     t0 = datetime.now(tz=timezone.utc)
-    return pd.DataFrame({
-        "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
-        "channel_id": "ch_01",
-        "current_a": rng.normal(nominal_current, 0.1, n),
-        "voltage_v": 13.5,
-        "temperature_c": 40.0 + rng.normal(0, 0.5, n),
-        "state_on_off": True,
-        "trip_flag": False,
-        "overload_flag": False,
-        "reset_counter": 0,
-        "pwm_duty_pct": 100.0,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
+            "channel_id": "ch_01",
+            "current_a": rng.normal(nominal_current, 0.1, n),
+            "voltage_v": 13.5,
+            "temperature_c": 40.0 + rng.normal(0, 0.5, n),
+            "state_on_off": True,
+            "trip_flag": False,
+            "overload_flag": False,
+            "reset_counter": 0,
+            "pwm_duty_pct": 100.0,
+        }
+    )
 
 
 def _build_runtime(

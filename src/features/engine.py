@@ -39,7 +39,7 @@ class FeatureEngine:
 
         # Rolling current statistics
         df["rolling_rms_current"] = grouped["current_a"].transform(
-            lambda s: (s ** 2).rolling(w, min_periods=mp).mean().pipe(np.sqrt)
+            lambda s: (s**2).rolling(w, min_periods=mp).mean().pipe(np.sqrt)
         )
         df["rolling_mean_current"] = grouped["current_a"].transform(
             lambda s: s.rolling(w, min_periods=mp).mean()
@@ -57,12 +57,8 @@ class FeatureEngine:
         )
 
         # Spike score — how many σ above rolling mean
-        roll_mean = grouped["current_a"].transform(
-            lambda s: s.rolling(w, min_periods=mp).mean()
-        )
-        roll_std = grouped["current_a"].transform(
-            lambda s: s.rolling(w, min_periods=mp).std()
-        )
+        roll_mean = grouped["current_a"].transform(lambda s: s.rolling(w, min_periods=mp).mean())
+        roll_std = grouped["current_a"].transform(lambda s: s.rolling(w, min_periods=mp).std())
         df["spike_score"] = ((df["current_a"] - roll_mean) / roll_std.replace(0, 1)).clip(lower=0)
 
         # Trip frequency — rolling sum of trip_flag transitions
@@ -82,11 +78,13 @@ class FeatureEngine:
 
         # Degradation trend — slope of rolling_mean_current over long window
         long_w = w * 4
-        df["degradation_trend"] = grouped["rolling_mean_current"].transform(
-            lambda s: s.rolling(long_w, min_periods=w).apply(
-                self._linear_slope, raw=True
+        df["degradation_trend"] = (
+            grouped["rolling_mean_current"]
+            .transform(
+                lambda s: s.rolling(long_w, min_periods=w).apply(self._linear_slope, raw=True)
             )
-        ).fillna(0)
+            .fillna(0)
+        )
 
         # --- Protection event features (when column is present) ---
         if "protection_event" in df.columns:
@@ -98,10 +96,17 @@ class FeatureEngine:
                 lambda s: (s != none_val).astype(int).rolling(w, min_periods=1).mean()
             )
             # Per-mechanism rolling counts
-            for event in (ProtectionEvent.SCP, ProtectionEvent.I2T, ProtectionEvent.LATCH_OFF, ProtectionEvent.THERMAL_SHUTDOWN):
+            for event in (
+                ProtectionEvent.SCP,
+                ProtectionEvent.I2T,
+                ProtectionEvent.LATCH_OFF,
+                ProtectionEvent.THERMAL_SHUTDOWN,
+            ):
                 col_name = f"{event.value}_count"
                 df[col_name] = df.groupby("channel_id")["protection_event"].transform(
-                    lambda s, ev=event.value: (s == ev).astype(int).rolling(w * 2, min_periods=1).sum()
+                    lambda s, ev=event.value: (
+                        (s == ev).astype(int).rolling(w * 2, min_periods=1).sum()
+                    )
                 )
 
         # Anomaly score placeholder (filled by model layer later)
@@ -120,7 +125,9 @@ class FeatureEngine:
         if n < 2:
             return 0.0
         x = np.arange(n, dtype=float)
-        slope = (n * np.dot(x, arr) - x.sum() * arr.sum()) / (n * np.dot(x, x) - x.sum() ** 2 + 1e-12)
+        slope = (n * np.dot(x, arr) - x.sum() * arr.sum()) / (
+            n * np.dot(x, x) - x.sum() ** 2 + 1e-12
+        )
         return float(slope)
 
     @staticmethod
@@ -133,7 +140,7 @@ class FeatureEngine:
         """
         trip = trip_series.astype(int)
         # Falling edge: trip goes from 1 to 0
-        falling = (trip.diff() == -1)
+        falling = trip.diff() == -1
         # We only count recovery while trip is False after a falling edge
         # Group by cumulative falling edges to segment recovery windows
         recovery_group = falling.cumsum()

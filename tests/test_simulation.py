@@ -76,6 +76,7 @@ def test_multiple_channels():
 # Dual ADC quantization
 # ---------------------------------------------------------------------------
 
+
 def test_voltage_adc_quantization():
     """Voltage signal should be quantized to voltage_adc_bits resolution."""
     ch = ChannelMeta(
@@ -89,7 +90,7 @@ def test_voltage_adc_quantization():
     df, _ = gen.generate()
     voltages = df["voltage_v"].dropna().values
     # With 10-bit ADC and ~40.5V range, LSB ≈ 0.0396V
-    v_lsb = (ch.nominal_voltage_v * 3.0) / (2 ** ch.voltage_adc_bits)
+    v_lsb = (ch.nominal_voltage_v * 3.0) / (2**ch.voltage_adc_bits)
     # Verify all voltages are near multiples of LSB
     residuals = voltages / v_lsb - (voltages / v_lsb).round()
     assert abs(residuals).max() < 0.01, "Voltage not quantized to voltage_adc_bits"
@@ -109,7 +110,7 @@ def test_current_adc_quantization():
     df, _ = gen.generate()
     currents = df["current_a"].dropna().values
     adc_range = ch.max_current_a * 1.5
-    lsb = adc_range / (2 ** ch.current_adc_bits)
+    lsb = adc_range / (2**ch.current_adc_bits)
     residuals = currents / lsb - (currents / lsb).round()
     assert abs(residuals).max() < 0.01, "Current not quantized to current_adc_bits"
 
@@ -117,6 +118,7 @@ def test_current_adc_quantization():
 # ---------------------------------------------------------------------------
 # F(i,t) protection integration
 # ---------------------------------------------------------------------------
+
 
 def test_fit_protection_trips_on_overload():
     """Overload spike fault should still cause a trip via F(i,t) model."""
@@ -216,6 +218,7 @@ def test_catalog_propagates_dual_adc():
 # Thermal shutdown simulation
 # ---------------------------------------------------------------------------
 
+
 def test_thermal_shutdown_fires_on_extreme_drift():
     """A THERMAL_DRIFT fault with high intensity on a low-threshold channel
     should trigger THERMAL_SHUTDOWN protection events."""
@@ -264,7 +267,7 @@ def test_thermal_shutdown_hysteresis_recovery():
         fuse_rating_a=20.0,
         thermal_shutdown_c=100.0,
         r_thermal_kw=60.0,
-        tau_thermal_s=3.0,   # fast thermal response for quicker decay
+        tau_thermal_s=3.0,  # fast thermal response for quicker decay
         t_ambient_c=25.0,
     )
     cfg = _make_config(

@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field, field_serializer
 # Enums
 # ---------------------------------------------------------------------------
 
+
 class DeviceStatus(str, Enum):
     OK = "ok"
     WARNING = "warning"
@@ -48,11 +49,12 @@ class ProtectionEvent(str, Enum):
     implications depending on whether it was a 10µs short-circuit
     comparator or a slow I²t energy integral.
     """
-    NONE = "none"                        # No protection event active
-    SCP = "scp"                          # Short-circuit protection (instantaneous comparator)
-    I2T = "i2t"                          # I²t / F(i,t) energy-integral overcurrent trip
-    THERMAL_SHUTDOWN = "thermal_shutdown" # Junction temperature exceeded limit
-    LATCH_OFF = "latch_off"              # Max retries exhausted — channel locked off
+
+    NONE = "none"  # No protection event active
+    SCP = "scp"  # Short-circuit protection (instantaneous comparator)
+    I2T = "i2t"  # I²t / F(i,t) energy-integral overcurrent trip
+    THERMAL_SHUTDOWN = "thermal_shutdown"  # Junction temperature exceeded limit
+    LATCH_OFF = "latch_off"  # Max retries exhausted — channel locked off
 
 
 class FaultType(str, Enum):
@@ -68,8 +70,9 @@ class FaultType(str, Enum):
 
 class SourceProtocol(str, Enum):
     """Telemetry source protocol — determines transport + typical sample rates."""
-    CAN = "can"        # Production vehicles — 20-100 ms typical
-    XCP = "xcp"        # Test vehicles — 10/50 ms DAQ rasters
+
+    CAN = "can"  # Production vehicles — 20-100 ms typical
+    XCP = "xcp"  # Test vehicles — 10/50 ms DAQ rasters
     REPLAY = "replay"  # Offline replay from recorded files
 
 
@@ -79,20 +82,22 @@ class EFuseFamily(str, Enum):
     Names follow industry convention: HS = high-side, LS = low-side.
     The suffix is the rated continuous current.
     """
-    HS_2A = "hs_2a"       # Interior LEDs, indicators, small sensors
-    HS_5A = "hs_5a"       # Dome lights, mirror fold, rain sensors
-    HS_10A = "hs_10a"     # Headlamps, fog lights, horn
-    HS_15A = "hs_15a"     # Wipers, power windows, heated mirrors
-    HS_20A = "hs_20a"     # Power seats, sunroof
-    HS_30A = "hs_30a"     # Seat heaters, rear defroster, fuel pump
-    HS_50A = "hs_50a"     # HVAC blower, starter relay, engine fan
-    LS_5A = "ls_5a"       # Ground-switch: ambient lighting, footwell LEDs
-    LS_15A = "ls_15a"     # Ground-switch: trunk motor, liftgate
+
+    HS_2A = "hs_2a"  # Interior LEDs, indicators, small sensors
+    HS_5A = "hs_5a"  # Dome lights, mirror fold, rain sensors
+    HS_10A = "hs_10a"  # Headlamps, fog lights, horn
+    HS_15A = "hs_15a"  # Wipers, power windows, heated mirrors
+    HS_20A = "hs_20a"  # Power seats, sunroof
+    HS_30A = "hs_30a"  # Seat heaters, rear defroster, fuel pump
+    HS_50A = "hs_50a"  # HVAC blower, starter relay, engine fan
+    LS_5A = "ls_5a"  # Ground-switch: ambient lighting, footwell LEDs
+    LS_15A = "ls_15a"  # Ground-switch: trunk motor, liftgate
 
 
 class SafetyLevel(str, Enum):
     """Functional safety compliance level (ISO 26262)."""
-    QM = "qm"           # Quality Management (no ASIL)
+
+    QM = "qm"  # Quality Management (no ASIL)
     ASIL_A = "asil_a"
     ASIL_B = "asil_b"
     ASIL_C = "asil_c"
@@ -105,9 +110,10 @@ class DriverType(str, Enum):
     Affects current measurement polarity, ground-offset behaviour,
     and which fault signatures are physically possible.
     """
-    HIGH_SIDE = "high_side"      # Battery → switch → load → GND (most common)
-    LOW_SIDE = "low_side"        # Battery → load → switch → GND
-    H_BRIDGE = "h_bridge"        # Bidirectional motor drive
+
+    HIGH_SIDE = "high_side"  # Battery → switch → load → GND (most common)
+    LOW_SIDE = "low_side"  # Battery → load → switch → GND
+    H_BRIDGE = "h_bridge"  # Bidirectional motor drive
     HALF_BRIDGE = "half_bridge"  # Push-pull (coils, injectors)
 
 
@@ -120,15 +126,17 @@ class PowerClass(str, Enum):
       - ACCESSORY: accessory rail (KLR) — radio, windows after key-off
       - START:     starter rail (KL50) — only during crank
     """
-    ALWAYS_ON = "always_on"     # KL30 — permanent battery
-    IGNITION = "ignition"       # KL15 — powered when ignition on
-    ACCESSORY = "accessory"     # KLR  — powered in accessory mode
-    START = "start"             # KL50 — powered only during crank
+
+    ALWAYS_ON = "always_on"  # KL30 — permanent battery
+    IGNITION = "ignition"  # KL15 — powered when ignition on
+    ACCESSORY = "accessory"  # KLR  — powered in accessory mode
+    START = "start"  # KL50 — powered only during crank
 
 
 # ---------------------------------------------------------------------------
 # eFuse electrical profile — template for a given IC type
 # ---------------------------------------------------------------------------
+
 
 class EFuseProfile(BaseModel):
     """Electrical + thermal template for an eFuse IC family.
@@ -141,6 +149,7 @@ class EFuseProfile(BaseModel):
     BTS7006-1EPP, ST VND7140AJ).  The optional identification fields
     (ic_part_number, manufacturer) provide traceability to real datasheets.
     """
+
     efuse_family: EFuseFamily
     nominal_current_a: float
     max_current_a: float
@@ -154,11 +163,17 @@ class EFuseProfile(BaseModel):
 
     # --- IC identification (optional — for traceability to real datasheets) ---
     ic_part_number: str = Field(default="", description="IC part number, e.g. 'BTS7006-1EPP'")
-    manufacturer: str = Field(default="", description="IC vendor, e.g. 'Infineon', 'STMicroelectronics'")
+    manufacturer: str = Field(
+        default="", description="IC vendor, e.g. 'Infineon', 'STMicroelectronics'"
+    )
 
     # --- ADC sensing ---
-    current_adc_bits: int = Field(default=12, description="Current-sense ADC resolution (varies by IC: 10-16 bit)")
-    voltage_adc_bits: int = Field(default=10, description="Voltage-sense ADC resolution (typ. 10-bit)")
+    current_adc_bits: int = Field(
+        default=12, description="Current-sense ADC resolution (varies by IC: 10-16 bit)"
+    )
+    voltage_adc_bits: int = Field(
+        default=10, description="Voltage-sense ADC resolution (typ. 10-bit)"
+    )
 
     # --- F(i,t) overcurrent protection ---
     # Many modern eFuse ICs integrate I²·t energy and trip when the
@@ -178,12 +193,15 @@ class EFuseProfile(BaseModel):
     )
 
     # --- Safety classification ---
-    safety_level: SafetyLevel = Field(default=SafetyLevel.QM, description="ISO 26262 classification")
+    safety_level: SafetyLevel = Field(
+        default=SafetyLevel.QM, description="ISO 26262 classification"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Zone Controller — physical ECU hosting eFuse ICs
 # ---------------------------------------------------------------------------
+
 
 class ZoneController(BaseModel):
     """Zone Controller — the physical ECU/gateway hosting eFuse ICs.
@@ -197,6 +215,7 @@ class ZoneController(BaseModel):
     Architecture:
         eFuse IC (HW) → SPI → CDD (SW driver) → COM stack → CAN/LIN bus
     """
+
     zone_id: str = Field(description="Unique Zone Controller identifier, e.g. 'zone_body'")
     name: str = Field(default="", description="Human-readable name, e.g. 'Body Zone Controller'")
     location: str = Field(
@@ -216,6 +235,7 @@ class ZoneController(BaseModel):
 # ---------------------------------------------------------------------------
 # Core telemetry record — one row per sample per channel
 # ---------------------------------------------------------------------------
+
 
 class TelemetryRecord(BaseModel):
     """Single telemetry sample from one eFuse / channel."""
@@ -246,6 +266,7 @@ class TelemetryRecord(BaseModel):
 # Event label — attached to simulated data for supervised evaluation
 # ---------------------------------------------------------------------------
 
+
 class EventLabel(BaseModel):
     """Ground-truth label produced by the simulator for a time window."""
 
@@ -259,6 +280,7 @@ class EventLabel(BaseModel):
 # ---------------------------------------------------------------------------
 # Channel metadata
 # ---------------------------------------------------------------------------
+
 
 class ChannelMeta(BaseModel):
     """Static metadata describing one eFuse / load channel.
@@ -277,8 +299,12 @@ class ChannelMeta(BaseModel):
     fuse_rating_a: float = 15.0
 
     # eFuse type + physical grouping
-    efuse_family: EFuseFamily = Field(default=EFuseFamily.HS_15A, description="eFuse IC family / current class")
-    zone_id: str = Field(default="", description="Zone Controller this channel belongs to (empty = unassigned)")
+    efuse_family: EFuseFamily = Field(
+        default=EFuseFamily.HS_15A, description="eFuse IC family / current class"
+    )
+    zone_id: str = Field(
+        default="", description="Zone Controller this channel belongs to (empty = unassigned)"
+    )
     connected_loads: list[str] = Field(
         default_factory=list,
         description="Vehicle systems connected to this channel, e.g. ['seat_heater_left', 'lumbar_support_left']",
@@ -310,7 +336,8 @@ class ChannelMeta(BaseModel):
 
     # Sampling rate — per-channel override; 0 means use global default
     sample_interval_ms: float = Field(
-        default=0.0, ge=0.0,
+        default=0.0,
+        ge=0.0,
         description="Channel sample interval in ms. 0 = use scenario default.",
     )
     source_protocol: SourceProtocol = Field(
@@ -323,25 +350,45 @@ class ChannelMeta(BaseModel):
         default="resistive",
         description="Load model: resistive | inductive | motor | ptc | capacitive",
     )
-    inrush_factor: float = Field(default=1.0, ge=1.0, description="Turn-on current multiplier vs nominal")
-    inrush_duration_ms: float = Field(default=0.0, ge=0.0, description="Inrush transient duration in ms")
+    inrush_factor: float = Field(
+        default=1.0, ge=1.0, description="Turn-on current multiplier vs nominal"
+    )
+    inrush_duration_ms: float = Field(
+        default=0.0, ge=0.0, description="Inrush transient duration in ms"
+    )
 
     # Thermal model (first-order RC)
     r_ds_on_ohm: float = Field(default=0.010, description="eFuse MOSFET on-resistance Ω")
-    r_thermal_kw: float = Field(default=40.0, description="Junction-to-ambient thermal resistance °C/W")
-    tau_thermal_s: float = Field(default=15.0, description="Thermal time constant (R_th × C_th) seconds")
+    r_thermal_kw: float = Field(
+        default=40.0, description="Junction-to-ambient thermal resistance °C/W"
+    )
+    tau_thermal_s: float = Field(
+        default=15.0, description="Thermal time constant (R_th × C_th) seconds"
+    )
     t_ambient_c: float = Field(default=25.0, description="Ambient temperature °C")
 
     # Noise profile
-    current_adc_bits: int = Field(default=12, ge=8, le=16, description="Current-sense ADC resolution")
-    voltage_adc_bits: int = Field(default=10, ge=8, le=16, description="Voltage-sense ADC resolution")
-    pink_noise_alpha: float = Field(default=1.0, ge=0.0, le=2.0, description="1/f^α noise exponent, 0=white 1=pink")
+    current_adc_bits: int = Field(
+        default=12, ge=8, le=16, description="Current-sense ADC resolution"
+    )
+    voltage_adc_bits: int = Field(
+        default=10, ge=8, le=16, description="Voltage-sense ADC resolution"
+    )
+    pink_noise_alpha: float = Field(
+        default=1.0, ge=0.0, le=2.0, description="1/f^α noise exponent, 0=white 1=pink"
+    )
     emi_amplitude_a: float = Field(default=0.05, ge=0.0, description="EMI spike amplitude in amps")
 
     # Protection behavior
-    fit_threshold_a2s: float = Field(default=0.0, ge=0.0, description="F(i,t) energy threshold A²·s (0 = auto)")
-    short_circuit_threshold_a: float = Field(default=0.0, ge=0.0, description="Instantaneous SCP trip (A) (0 = auto)")
-    thermal_shutdown_c: float = Field(default=150.0, ge=50.0, description="Junction temp for thermal shutdown (°C)")
+    fit_threshold_a2s: float = Field(
+        default=0.0, ge=0.0, description="F(i,t) energy threshold A²·s (0 = auto)"
+    )
+    short_circuit_threshold_a: float = Field(
+        default=0.0, ge=0.0, description="Instantaneous SCP trip (A) (0 = auto)"
+    )
+    thermal_shutdown_c: float = Field(
+        default=150.0, ge=50.0, description="Junction temp for thermal shutdown (°C)"
+    )
     cooldown_s: float = Field(default=1.0, ge=0.0, description="Auto-retry delay after eFuse trip")
     max_retries: int = Field(default=3, ge=0, description="Max auto-retries before latch-off")
 
@@ -359,6 +406,7 @@ class FaultInjection(BaseModel):
 # ---------------------------------------------------------------------------
 # Derived features record
 # ---------------------------------------------------------------------------
+
 
 class DerivedFeatures(BaseModel):
     """Rolling / derived features computed from raw telemetry."""
@@ -380,6 +428,7 @@ class DerivedFeatures(BaseModel):
 # ---------------------------------------------------------------------------
 # Inference output
 # ---------------------------------------------------------------------------
+
 
 class InferenceResult(BaseModel):
     """Output of the inference pipeline for one evaluation window."""

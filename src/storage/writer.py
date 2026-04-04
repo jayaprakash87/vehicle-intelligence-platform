@@ -49,7 +49,8 @@ class StorageWriter:
             if free_mb < self._disk_min_free_mb:
                 log.warning(
                     "Low disk space: %.0f MB free (threshold: %d MB) — skipping write",
-                    free_mb, self._disk_min_free_mb,
+                    free_mb,
+                    self._disk_min_free_mb,
                 )
                 return False
         except OSError:

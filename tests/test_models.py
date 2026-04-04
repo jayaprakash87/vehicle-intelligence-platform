@@ -14,19 +14,21 @@ def _make_featured_df(n: int = 500) -> pd.DataFrame:
     """Generate a feature-enriched DataFrame for model testing."""
     rng = np.random.default_rng(42)
     t0 = datetime.now(tz=timezone.utc)
-    df = pd.DataFrame({
-        "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
-        "channel_id": "ch_01",
-        "current_a": rng.normal(5.0, 0.2, n),
-        "voltage_v": rng.normal(13.5, 0.05, n),
-        "temperature_c": 25.0 + np.cumsum(rng.normal(0, 0.01, n)),
-        "state_on_off": True,
-        "trip_flag": False,
-        "overload_flag": False,
-        "reset_counter": 0,
-        "pwm_duty_pct": 100.0,
-        "device_status": "ok",
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
+            "channel_id": "ch_01",
+            "current_a": rng.normal(5.0, 0.2, n),
+            "voltage_v": rng.normal(13.5, 0.05, n),
+            "temperature_c": 25.0 + np.cumsum(rng.normal(0, 0.01, n)),
+            "state_on_off": True,
+            "trip_flag": False,
+            "overload_flag": False,
+            "reset_counter": 0,
+            "pwm_duty_pct": 100.0,
+            "device_status": "ok",
+        }
+    )
     engine = FeatureEngine(FeatureConfig(window_size=20, min_periods=5))
     return engine.compute(df)
 
@@ -96,6 +98,7 @@ def test_rules_classifier_nominal():
 # ---------------------------------------------------------------------------
 # Protection-event-aware classification
 # ---------------------------------------------------------------------------
+
 
 def test_classifier_latch_off_from_scp():
     """Latch-off with preceding SCP trips should reference short-circuit."""

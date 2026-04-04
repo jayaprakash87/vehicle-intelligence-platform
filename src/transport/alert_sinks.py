@@ -96,8 +96,12 @@ class MqttAlertSink(AlertSinkBase):
             self._client.connect(broker_host, broker_port, keepalive=60)
             self._client.loop_start()
         except Exception as exc:
-            log.warning("MQTT connect failed (%s:%d): %s — alerts will be logged only",
-                        broker_host, broker_port, exc)
+            log.warning(
+                "MQTT connect failed (%s:%d): %s — alerts will be logged only",
+                broker_host,
+                broker_port,
+                exc,
+            )
             self._client = None
 
     def _on_connect(self, client, userdata, flags, rc, properties=None) -> None:

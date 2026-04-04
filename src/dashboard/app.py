@@ -62,8 +62,16 @@ if inject_fault:
         format_func=lambda x: x.replace("_", " ").title(),
     )
     fault_channel_idx = st.sidebar.number_input("Channel index (0-based)", value=0, min_value=0)
-    fault_start = st.sidebar.slider("Fault start (s)", 1.0, float(duration_s - 2), float(duration_s // 4), step=0.5)
-    fault_duration = st.sidebar.slider("Fault duration (s)", 1.0, float(duration_s - fault_start - 1), min(5.0, float(duration_s - fault_start - 1)), step=0.5)
+    fault_start = st.sidebar.slider(
+        "Fault start (s)", 1.0, float(duration_s - 2), float(duration_s // 4), step=0.5
+    )
+    fault_duration = st.sidebar.slider(
+        "Fault duration (s)",
+        1.0,
+        float(duration_s - fault_start - 1),
+        min(5.0, float(duration_s - fault_start - 1)),
+        step=0.5,
+    )
     fault_intensity = st.sidebar.slider("Intensity", 0.1, 1.0, 0.8, step=0.05)
 
 run_btn = st.sidebar.button("🚀 Run pipeline", type="primary", use_container_width=True)
@@ -75,9 +83,16 @@ run_btn = st.sidebar.button("🚀 Run pipeline", type="primary", use_container_w
 
 @st.cache_data(show_spinner="Running VIP pipeline…")
 def run_pipeline(
-    topo: str, dur: float, samp_ms: float, seed_val: int,
-    inject: bool, f_type: str | None, f_ch_idx: int,
-    f_start: float, f_dur: float, f_intensity: float,
+    topo: str,
+    dur: float,
+    samp_ms: float,
+    seed_val: int,
+    inject: bool,
+    f_type: str | None,
+    f_ch_idx: int,
+    f_start: float,
+    f_dur: float,
+    f_intensity: float,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Generate → normalise → features → train → infer.  Returns (raw, scored, labels)."""
     # Build channels
@@ -94,13 +109,15 @@ def run_pipeline(
     faults: list[FaultInjection] = []
     if inject and f_type:
         ch_idx = min(f_ch_idx, len(channels) - 1)
-        faults.append(FaultInjection(
-            channel_id=channels[ch_idx].channel_id,
-            fault_type=FaultType(f_type),
-            start_s=f_start,
-            duration_s=f_dur,
-            intensity=f_intensity,
-        ))
+        faults.append(
+            FaultInjection(
+                channel_id=channels[ch_idx].channel_id,
+                fault_type=FaultType(f_type),
+                start_s=f_start,
+                duration_s=f_dur,
+                intensity=f_intensity,
+            )
+        )
 
     sim_cfg = SimulationConfig(
         duration_s=dur,
@@ -145,9 +162,16 @@ if run_btn or "scored" not in st.session_state:
     f_ch_val = fault_channel_idx if inject_fault else 0
 
     raw, scored, labels = run_pipeline(
-        topology, duration_s, sample_ms, seed,
-        inject_fault, f_type_val, f_ch_val,
-        f_start_val, f_dur_val, f_int_val,
+        topology,
+        duration_s,
+        sample_ms,
+        seed,
+        inject_fault,
+        f_type_val,
+        f_ch_val,
+        f_start_val,
+        f_dur_val,
+        f_int_val,
     )
     st.session_state["raw"] = raw
     st.session_state["scored"] = scored
@@ -165,7 +189,11 @@ st.title("Vehicle Intelligence Platform")
 
 n_channels = scored["channel_id"].nunique()
 n_anomalies = int(scored["is_anomaly"].sum()) if "is_anomaly" in scored.columns else 0
-n_faults = int((scored["predicted_fault"] != FaultType.NONE.value).sum()) if "predicted_fault" in scored.columns else 0
+n_faults = (
+    int((scored["predicted_fault"] != FaultType.NONE.value).sum())
+    if "predicted_fault" in scored.columns
+    else 0
+)
 n_protection = 0
 if "protection_event" in scored.columns:
     n_protection = int((scored["protection_event"] != ProtectionEvent.NONE.value).sum())
@@ -209,7 +237,10 @@ with tab_signals:
     st.subheader("Raw signals")
 
     fig_current = px.line(
-        view, x="timestamp", y="current_a", color="channel_id",
+        view,
+        x="timestamp",
+        y="current_a",
+        color="channel_id",
         title="Current (A)",
         labels={"current_a": "Current (A)", "timestamp": "Time"},
     )
@@ -219,14 +250,20 @@ with tab_signals:
     col_v, col_t = st.columns(2)
     with col_v:
         fig_v = px.line(
-            view, x="timestamp", y="voltage_v", color="channel_id",
+            view,
+            x="timestamp",
+            y="voltage_v",
+            color="channel_id",
             title="Voltage (V)",
         )
         fig_v.update_layout(height=300, margin=dict(t=40, b=30))
         st.plotly_chart(fig_v, use_container_width=True)
     with col_t:
         fig_t = px.line(
-            view, x="timestamp", y="temperature_c", color="channel_id",
+            view,
+            x="timestamp",
+            y="temperature_c",
+            color="channel_id",
             title="Temperature (°C)",
         )
         fig_t.update_layout(height=300, margin=dict(t=40, b=30))
@@ -238,7 +275,10 @@ with tab_anomaly:
 
     if "anomaly_score" in view.columns:
         fig_anom = px.line(
-            view, x="timestamp", y="anomaly_score", color="channel_id",
+            view,
+            x="timestamp",
+            y="anomaly_score",
+            color="channel_id",
             title="Anomaly score over time",
         )
         fig_anom.add_hline(y=0.5, line_dash="dash", line_color="red", annotation_text="Threshold")
@@ -247,7 +287,10 @@ with tab_anomaly:
 
     if "spike_score" in view.columns:
         fig_spike = px.line(
-            view, x="timestamp", y="spike_score", color="channel_id",
+            view,
+            x="timestamp",
+            y="spike_score",
+            color="channel_id",
             title="Spike score",
         )
         fig_spike.update_layout(height=300, margin=dict(t=40, b=30))
@@ -258,8 +301,17 @@ with tab_anomaly:
         st.write(f"**{len(anom_rows)} anomalous rows** in selected channels")
         if len(anom_rows) > 0:
             st.dataframe(
-                anom_rows[["timestamp", "channel_id", "anomaly_score", "current_a",
-                           "voltage_v", "temperature_c", "predicted_fault"]].head(50),
+                anom_rows[
+                    [
+                        "timestamp",
+                        "channel_id",
+                        "anomaly_score",
+                        "current_a",
+                        "voltage_v",
+                        "temperature_c",
+                        "predicted_fault",
+                    ]
+                ].head(50),
                 use_container_width=True,
             )
 
@@ -275,7 +327,10 @@ with tab_faults:
             fault_counts = fault_view["predicted_fault"].value_counts().reset_index()
             fault_counts.columns = ["fault_type", "count"]
             fig_fdist = px.bar(
-                fault_counts, x="fault_type", y="count", color="fault_type",
+                fault_counts,
+                x="fault_type",
+                y="count",
+                color="fault_type",
                 title="Fault type distribution",
             )
             fig_fdist.update_layout(height=300, margin=dict(t=40, b=30), showlegend=False)
@@ -283,7 +338,10 @@ with tab_faults:
 
             # Fault timeline
             fig_ftime = px.scatter(
-                fault_view, x="timestamp", y="channel_id", color="predicted_fault",
+                fault_view,
+                x="timestamp",
+                y="channel_id",
+                color="predicted_fault",
                 size="fault_confidence",
                 title="Fault timeline",
                 labels={"predicted_fault": "Fault type"},
@@ -292,8 +350,13 @@ with tab_faults:
             st.plotly_chart(fig_ftime, use_container_width=True)
 
             # Detail table
-            display_cols = ["timestamp", "channel_id", "predicted_fault",
-                            "fault_confidence", "likely_causes"]
+            display_cols = [
+                "timestamp",
+                "channel_id",
+                "predicted_fault",
+                "fault_confidence",
+                "likely_causes",
+            ]
             available = [c for c in display_cols if c in fault_view.columns]
             st.dataframe(fault_view[available].head(100), use_container_width=True)
         else:
@@ -311,7 +374,9 @@ with tab_protection:
             pe_counts = pe_view["protection_event"].value_counts().reset_index()
             pe_counts.columns = ["event_type", "count"]
             fig_pe = px.pie(
-                pe_counts, names="event_type", values="count",
+                pe_counts,
+                names="event_type",
+                values="count",
                 title="Protection event breakdown",
                 color_discrete_sequence=px.colors.qualitative.Set2,
             )
@@ -320,7 +385,10 @@ with tab_protection:
 
             # Timeline
             fig_pet = px.scatter(
-                pe_view, x="timestamp", y="channel_id", color="protection_event",
+                pe_view,
+                x="timestamp",
+                y="channel_id",
+                color="protection_event",
                 title="Protection event timeline",
                 symbol="protection_event",
             )
@@ -328,9 +396,14 @@ with tab_protection:
             st.plotly_chart(fig_pet, use_container_width=True)
 
             # Counts per channel
-            pe_by_ch = pe_view.groupby(["channel_id", "protection_event"]).size().reset_index(name="count")
+            pe_by_ch = (
+                pe_view.groupby(["channel_id", "protection_event"]).size().reset_index(name="count")
+            )
             fig_pech = px.bar(
-                pe_by_ch, x="channel_id", y="count", color="protection_event",
+                pe_by_ch,
+                x="channel_id",
+                y="count",
+                color="protection_event",
                 title="Protection events per channel",
                 barmode="stack",
             )
@@ -356,15 +429,17 @@ with tab_summary:
         pe_col = grp.get("protection_event", pd.Series(dtype=str))
         n_trips = int((pe_col != ProtectionEvent.NONE.value).sum()) if len(pe_col) > 0 else 0
 
-        summary_rows.append({
-            "channel_id": ch_id,
-            "rows": n,
-            "anomalies": anom,
-            "anomaly_rate": f"{anom / n * 100:.1f}%" if n > 0 else "0%",
-            "max_score": f"{max_score:.3f}",
-            "top_fault": top_fault,
-            "protection_trips": n_trips,
-        })
+        summary_rows.append(
+            {
+                "channel_id": ch_id,
+                "rows": n,
+                "anomalies": anom,
+                "anomaly_rate": f"{anom / n * 100:.1f}%" if n > 0 else "0%",
+                "max_score": f"{max_score:.3f}",
+                "top_fault": top_fault,
+                "protection_trips": n_trips,
+            }
+        )
 
     summary_df = pd.DataFrame(summary_rows)
     st.dataframe(summary_df, use_container_width=True, height=min(len(summary_df) * 35 + 40, 600))
@@ -373,11 +448,15 @@ with tab_summary:
     st.subheader("Channel health heatmap")
     if len(summary_df) > 0:
         heatmap_data = summary_df.copy()
-        heatmap_data["anomaly_pct"] = heatmap_data["anomalies"].astype(int) / heatmap_data["rows"].astype(int) * 100
+        heatmap_data["anomaly_pct"] = (
+            heatmap_data["anomalies"].astype(int) / heatmap_data["rows"].astype(int) * 100
+        )
         heatmap_data = heatmap_data.sort_values("anomaly_pct", ascending=False).head(20)
 
         fig_heat = px.bar(
-            heatmap_data, x="channel_id", y="anomaly_pct",
+            heatmap_data,
+            x="channel_id",
+            y="anomaly_pct",
             color="anomaly_pct",
             color_continuous_scale="RdYlGn_r",
             title="Top 20 channels by anomaly rate (%)",

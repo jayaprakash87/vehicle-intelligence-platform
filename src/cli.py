@@ -30,6 +30,7 @@ console = Console(stderr=True)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _setup(
     config: str,
     output_dir: str | None = None,
@@ -110,20 +111,30 @@ def simulate(
     writer.write_telemetry(telem_df)
     writer.write_labels(labels_df)
 
-    console.print(f"[green]Generated {len(telem_df)} telemetry rows, {len(labels_df)} labels[/green]")
+    console.print(
+        f"[green]Generated {len(telem_df)} telemetry rows, {len(labels_df)} labels[/green]"
+    )
 
 
 @app.command()
 def replay(
-    data_path: str = typer.Argument(..., help="Path to measurement file (.mf4, .mdf, .csv, .parquet)"),
+    data_path: str = typer.Argument(
+        ..., help="Path to measurement file (.mf4, .mdf, .csv, .parquet)"
+    ),
     config: str = typer.Option("configs/default.yaml", "--config", "-c"),
     output_dir: str = typer.Option("output", "--output", "-o"),
     fmt: str = typer.Option("parquet", "--format", "-f"),
-    channel_id: str = typer.Option("ch_01", "--channel", help="Default channel ID when file has no channel column"),
+    channel_id: str = typer.Option(
+        "ch_01", "--channel", help="Default channel ID when file has no channel column"
+    ),
     map_current: str = typer.Option("", "--map-current", help="Source signal name for current_a"),
     map_voltage: str = typer.Option("", "--map-voltage", help="Source signal name for voltage_v"),
-    map_temperature: str = typer.Option("", "--map-temperature", help="Source signal name for temperature_c"),
-    map_timestamp: str = typer.Option("", "--map-timestamp", help="Source signal name for timestamp"),
+    map_temperature: str = typer.Option(
+        "", "--map-temperature", help="Source signal name for temperature_c"
+    ),
+    map_timestamp: str = typer.Option(
+        "", "--map-timestamp", help="Source signal name for timestamp"
+    ),
     json_log: bool = typer.Option(False, "--json-log", help="Emit structured JSON logs"),
 ) -> None:
     """Replay real measurement data (MDF4/CSV/Parquet) through the VIP pipeline."""
@@ -302,7 +313,9 @@ def edge(
 
     console.print(f"\n[bold]Edge run complete — {len(alerts)} alerts[/bold]")
     for a in alerts[:10]:
-        console.print(f"  {a['timestamp']}  {a['channel_id']}  {a['fault']}  score={a['score']:.2f}")
+        console.print(
+            f"  {a['timestamp']}  {a['channel_id']}  {a['fault']}  score={a['score']:.2f}"
+        )
     if len(alerts) > 10:
         console.print(f"  ... and {len(alerts) - 10} more")
 

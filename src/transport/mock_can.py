@@ -57,7 +57,7 @@ class DataFrameTransport(TransportBase):
         end = min(self._idx + size, len(self._df))
         if self._idx >= end:
             return []
-        chunk = self._df.iloc[self._idx:end].to_dict(orient="records")
+        chunk = self._df.iloc[self._idx : end].to_dict(orient="records")
         self._idx = end
         return chunk
 
@@ -106,7 +106,9 @@ class XcpTransport(DataFrameTransport):
         self.slow_raster_ms = slow_raster_ms
         log.info(
             "XCP transport: fast=%gms, slow=%gms, %d rows",
-            fast_raster_ms, slow_raster_ms, len(df),
+            fast_raster_ms,
+            slow_raster_ms,
+            len(df),
         )
 
 

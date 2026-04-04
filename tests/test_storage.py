@@ -13,13 +13,15 @@ from src.storage.writer import StorageWriter
 
 def _sample_df(n: int = 20) -> pd.DataFrame:
     t0 = datetime.now(tz=timezone.utc)
-    return pd.DataFrame({
-        "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
-        "channel_id": "ch_01",
-        "current_a": np.random.default_rng(0).normal(5.0, 0.1, n),
-        "voltage_v": 13.5,
-        "list_col": [["a", "b"]] * n,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
+            "channel_id": "ch_01",
+            "current_a": np.random.default_rng(0).normal(5.0, 0.1, n),
+            "voltage_v": 13.5,
+            "list_col": [["a", "b"]] * n,
+        }
+    )
 
 
 @pytest.fixture()

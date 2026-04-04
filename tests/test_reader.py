@@ -17,37 +17,43 @@ from src.schemas.telemetry import DeviceStatus, ProtectionEvent
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_csv_data(n: int = 50) -> pd.DataFrame:
     """Create a minimal DataFrame that would come from a CSV."""
     rng = np.random.default_rng(42)
     t0 = datetime.now(tz=timezone.utc)
-    return pd.DataFrame({
-        "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
-        "channel_id": "ch_01",
-        "current_a": rng.normal(5.0, 0.2, n),
-        "voltage_v": rng.normal(13.5, 0.05, n),
-        "temperature_c": 25.0 + rng.normal(0, 0.5, n),
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
+            "channel_id": "ch_01",
+            "current_a": rng.normal(5.0, 0.2, n),
+            "voltage_v": rng.normal(13.5, 0.05, n),
+            "temperature_c": 25.0 + rng.normal(0, 0.5, n),
+        }
+    )
 
 
 def _make_oem_data(n: int = 50) -> pd.DataFrame:
     """Create data with OEM-specific signal names."""
     rng = np.random.default_rng(42)
     t0 = datetime.now(tz=timezone.utc)
-    return pd.DataFrame({
-        "Time_UTC": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
-        "IC1_Ch1_Isense": rng.normal(5.0, 0.2, n),
-        "IC1_Ch1_Vsense": rng.normal(13.5, 0.05, n),
-        "IC1_Ch1_Tjunction": 25.0 + rng.normal(0, 0.5, n),
-        "IC1_Ch2_Isense": rng.normal(10.0, 0.3, n),
-        "IC1_Ch2_Vsense": rng.normal(13.5, 0.05, n),
-        "IC1_Ch2_Tjunction": 30.0 + rng.normal(0, 0.5, n),
-    })
+    return pd.DataFrame(
+        {
+            "Time_UTC": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
+            "IC1_Ch1_Isense": rng.normal(5.0, 0.2, n),
+            "IC1_Ch1_Vsense": rng.normal(13.5, 0.05, n),
+            "IC1_Ch1_Tjunction": 25.0 + rng.normal(0, 0.5, n),
+            "IC1_Ch2_Isense": rng.normal(10.0, 0.3, n),
+            "IC1_Ch2_Vsense": rng.normal(13.5, 0.05, n),
+            "IC1_Ch2_Tjunction": 30.0 + rng.normal(0, 0.5, n),
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # ColumnMapping
 # ---------------------------------------------------------------------------
+
 
 class TestColumnMapping:
     def test_defaults(self):
@@ -74,6 +80,7 @@ class TestColumnMapping:
 # ---------------------------------------------------------------------------
 # MeasurementReader — CSV
 # ---------------------------------------------------------------------------
+
 
 class TestReaderCsv:
     def test_read_csv_with_defaults(self, tmp_path):
@@ -144,6 +151,7 @@ class TestReaderCsv:
 # MeasurementReader — Parquet
 # ---------------------------------------------------------------------------
 
+
 class TestReaderParquet:
     def test_read_parquet(self, tmp_path):
         df = _make_csv_data()
@@ -177,6 +185,7 @@ class TestReaderParquet:
 # ---------------------------------------------------------------------------
 # Multi-channel reading
 # ---------------------------------------------------------------------------
+
 
 class TestMultiChannel:
     def test_read_multichannel(self, tmp_path):
@@ -214,6 +223,7 @@ class TestMultiChannel:
 # MDF4 (mocked)
 # ---------------------------------------------------------------------------
 
+
 class TestReaderMdf4:
     def test_read_mdf4_mocked(self, tmp_path):
         """MDF4 reading via asammdf — mock the MDF class."""
@@ -249,10 +259,13 @@ class TestReaderMdf4:
         with patch("src.ingestion.reader.MDF", return_value=mock_mdf, create=True):
             # Patch the import inside _read_mdf4
             import src.ingestion.reader as reader_mod
+
             getattr(reader_mod, "_mdf_import_done", False)
             with patch.object(reader_mod, "_read_mdf4_import", create=True):
                 # Directly patch asammdf.MDF in the function's local scope
-                with patch.dict("sys.modules", {"asammdf": MagicMock(MDF=MagicMock(return_value=mock_mdf))}):
+                with patch.dict(
+                    "sys.modules", {"asammdf": MagicMock(MDF=MagicMock(return_value=mock_mdf))}
+                ):
                     result = reader.read(str(mf4_path))
 
         assert len(result) == 30
@@ -265,16 +278,19 @@ class TestReaderMdf4:
 # Type coercion
 # ---------------------------------------------------------------------------
 
+
 class TestTypeCoercion:
     def test_numeric_coercion(self, tmp_path):
         """String values in numeric columns should be coerced."""
-        df = pd.DataFrame({
-            "timestamp": pd.date_range("2026-01-01", periods=5, freq="100ms", tz="UTC"),
-            "channel_id": "ch_01",
-            "current_a": ["5.1", "5.2", "bad", "5.4", "5.5"],
-            "voltage_v": ["13.5", "13.4", "13.6", "13.5", "13.4"],
-            "temperature_c": ["25.0", "25.1", "25.2", "25.3", "25.4"],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.date_range("2026-01-01", periods=5, freq="100ms", tz="UTC"),
+                "channel_id": "ch_01",
+                "current_a": ["5.1", "5.2", "bad", "5.4", "5.5"],
+                "voltage_v": ["13.5", "13.4", "13.6", "13.5", "13.4"],
+                "temperature_c": ["25.0", "25.1", "25.2", "25.3", "25.4"],
+            }
+        )
         csv_path = tmp_path / "string_nums.csv"
         df.to_csv(csv_path, index=False)
 

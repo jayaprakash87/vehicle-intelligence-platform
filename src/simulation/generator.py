@@ -77,10 +77,14 @@ class TelemetryGenerator:
                 bus_voltage = bus_voltage_fine[::step][:n_samples]
                 # Pad if rounding left us short
                 if len(bus_voltage) < n_samples:
-                    bus_voltage = np.pad(bus_voltage, (0, n_samples - len(bus_voltage)), mode="edge")
+                    bus_voltage = np.pad(
+                        bus_voltage, (0, n_samples - len(bus_voltage)), mode="edge"
+                    )
 
             ch_faults = [f for f in self.cfg.fault_injections if f.channel_id == ch.channel_id]
-            ch_df, label_df = self._generate_channel(timestamps, ch, ch_faults, bus_voltage, interval_s)
+            ch_df, label_df = self._generate_channel(
+                timestamps, ch, ch_faults, bus_voltage, interval_s
+            )
             all_telem.append(ch_df)
             all_labels.append(label_df)
 
@@ -89,7 +93,9 @@ class TelemetryGenerator:
 
         log.info(
             "Generated %d telemetry rows, %d labels across %d channels",
-            len(telem_df), len(labels_df), len(self.cfg.channels),
+            len(telem_df),
+            len(labels_df),
+            len(self.cfg.channels),
         )
         return telem_df, labels_df
 
@@ -134,7 +140,7 @@ class TelemetryGenerator:
 
         # ADC quantization noise (current-sense ADC)
         adc_range = ch.max_current_a * 1.5  # full-scale range
-        lsb = adc_range / (2 ** ch.current_adc_bits)
+        lsb = adc_range / (2**ch.current_adc_bits)
         quant_noise = self.rng.uniform(-lsb / 2, lsb / 2, n)
         noise += quant_noise
 
@@ -222,7 +228,9 @@ class TelemetryGenerator:
     # Fault waveform shaping
     # ------------------------------------------------------------------
 
-    def _fault_envelope_rise_fall(self, n_fault: int, rise_frac: float = 0.15, fall_frac: float = 0.15) -> np.ndarray:
+    def _fault_envelope_rise_fall(
+        self, n_fault: int, rise_frac: float = 0.15, fall_frac: float = 0.15
+    ) -> np.ndarray:
         """Generate a trapezoidal envelope with exponential rise and fall."""
         env = np.ones(n_fault)
         n_rise = max(int(n_fault * rise_frac), 1)
@@ -233,7 +241,9 @@ class TelemetryGenerator:
         env[-n_fall:] = np.exp(-3 * np.arange(n_fall) / n_fall)
         return env
 
-    def _oscillating_envelope(self, n_fault: int, freq_cycles: float = 3.0, damping: float = 2.0) -> np.ndarray:
+    def _oscillating_envelope(
+        self, n_fault: int, freq_cycles: float = 3.0, damping: float = 2.0
+    ) -> np.ndarray:
         """Damped oscillation for intermittent faults."""
         t = np.linspace(0, 1, n_fault)
         osc = np.exp(-damping * t) * np.abs(np.sin(2 * np.pi * freq_cycles * t))
@@ -272,7 +282,7 @@ class TelemetryGenerator:
         # Resolve auto thresholds (0 means "derive from profile")
         fit_thresh = ch.fit_threshold_a2s
         if fit_thresh <= 0:
-            fit_thresh = ch.fuse_rating_a ** 2 * 0.01  # sensible default
+            fit_thresh = ch.fuse_rating_a**2 * 0.01  # sensible default
 
         scp_thresh = ch.short_circuit_threshold_a
         if scp_thresh <= 0:
@@ -298,10 +308,10 @@ class TelemetryGenerator:
 
                 # F(i,t) energy integration (only when above nominal)
                 if i_abs > ch.nominal_current_a:
-                    energy += (i_abs ** 2) * interval_s
+                    energy += (i_abs**2) * interval_s
                 else:
                     # Drain energy slowly when below nominal (thermal dissipation)
-                    energy = max(0.0, energy - (ch.nominal_current_a ** 2) * interval_s * 0.5)
+                    energy = max(0.0, energy - (ch.nominal_current_a**2) * interval_s * 0.5)
 
                 if energy >= fit_thresh:
                     i = j
@@ -384,29 +394,52 @@ class TelemetryGenerator:
             match fi.fault_type:
                 case FaultType.OVERLOAD_SPIKE:
                     # Exponential rise to overcurrent, then protection kicks in
-                    envelope = self._fault_envelope_rise_fall(n_fault, rise_frac=0.05, fall_frac=0.0)
+                    envelope = self._fault_envelope_rise_fall(
+                        n_fault, rise_frac=0.05, fall_frac=0.0
+                    )
                     peak = ch.max_current_a * (1.0 + fi.intensity * 0.5)
                     current[sl] = peak * envelope + self._composite_noise(n_fault, ch) * 0.5
                     trip[sl] = True
                     overload[sl] = True
                     status[sl] = DeviceStatus.FAULT.value
                     # Protection response: trip → off → cooldown → retry
-                    self._apply_protection(current, state, trip, protection_event, reset_counter, ch, start_idx, end_idx, interval_s)
+                    self._apply_protection(
+                        current,
+                        state,
+                        trip,
+                        protection_event,
+                        reset_counter,
+                        ch,
+                        start_idx,
+                        end_idx,
+                        interval_s,
+                    )
 
                 case FaultType.INTERMITTENT_OVERLOAD:
                     # Damped oscillation — repeated overcurrent bursts
-                    osc = self._oscillating_envelope(n_fault, freq_cycles=4.0 * fi.intensity, damping=1.5)
-                    current[sl] = ch.nominal_current_a + osc * (ch.max_current_a * 1.2 - ch.nominal_current_a) * fi.intensity
+                    osc = self._oscillating_envelope(
+                        n_fault, freq_cycles=4.0 * fi.intensity, damping=1.5
+                    )
+                    current[sl] = (
+                        ch.nominal_current_a
+                        + osc * (ch.max_current_a * 1.2 - ch.nominal_current_a) * fi.intensity
+                    )
                     current[sl] += self._composite_noise(n_fault, ch) * 0.3
                     overload_mask = current[sl] > ch.fuse_rating_a * 0.9
                     overload[start_idx:end_idx] = overload_mask
-                    status[sl] = np.where(overload_mask, DeviceStatus.WARNING.value, DeviceStatus.OK.value)
+                    status[sl] = np.where(
+                        overload_mask, DeviceStatus.WARNING.value, DeviceStatus.OK.value
+                    )
 
                 case FaultType.VOLTAGE_SAG:
                     # Exponential voltage drop (like battery under heavy load)
-                    envelope = self._fault_envelope_rise_fall(n_fault, rise_frac=0.10, fall_frac=0.20)
+                    envelope = self._fault_envelope_rise_fall(
+                        n_fault, rise_frac=0.10, fall_frac=0.20
+                    )
                     sag_depth = ch.nominal_voltage_v * 0.3 * fi.intensity
-                    voltage[sl] = bus_voltage[sl] - sag_depth * envelope + self.rng.normal(0, 0.05, n_fault)
+                    voltage[sl] = (
+                        bus_voltage[sl] - sag_depth * envelope + self.rng.normal(0, 0.05, n_fault)
+                    )
                     status[sl] = DeviceStatus.WARNING.value
 
                 case FaultType.THERMAL_DRIFT:
@@ -418,7 +451,9 @@ class TelemetryGenerator:
 
                 case FaultType.NOISY_SENSOR:
                     # Burst noise with varying amplitude — not flat Gaussian
-                    burst_envelope = self._oscillating_envelope(n_fault, freq_cycles=6.0, damping=0.5)
+                    burst_envelope = self._oscillating_envelope(
+                        n_fault, freq_cycles=6.0, damping=0.5
+                    )
                     noise_scale = 2.0 * fi.intensity
                     current[sl] += burst_envelope * self.rng.normal(0, noise_scale, n_fault)
                     voltage[sl] += burst_envelope * self.rng.normal(0, noise_scale * 0.2, n_fault)
@@ -476,14 +511,14 @@ class TelemetryGenerator:
         # ADC quantization on final current signal
         if ch.current_adc_bits < 16:
             adc_range = ch.max_current_a * 1.5
-            lsb = adc_range / (2 ** ch.current_adc_bits)
+            lsb = adc_range / (2**ch.current_adc_bits)
             valid_mask = ~np.isnan(current)
             current[valid_mask] = np.round(current[valid_mask] / lsb) * lsb
 
         # ADC quantization on voltage signal (separate, typically lower resolution)
         if ch.voltage_adc_bits < 16:
             v_adc_range = ch.nominal_voltage_v * 3.0  # full-scale ~40V for 13.5V nominal
-            v_lsb = v_adc_range / (2 ** ch.voltage_adc_bits)
+            v_lsb = v_adc_range / (2**ch.voltage_adc_bits)
             v_valid = ~np.isnan(voltage)
             voltage[v_valid] = np.round(voltage[v_valid] / v_lsb) * v_lsb
 
@@ -498,32 +533,38 @@ class TelemetryGenerator:
         current_out = current.copy()
         voltage_out = voltage.copy()
 
-        ch_df = pd.DataFrame({
-            "timestamp": timestamps,
-            "channel_id": ch.channel_id,
-            "current_a": current_out,
-            "voltage_v": voltage_out,
-            "temperature_c": temperature,
-            "state_on_off": state,
-            "trip_flag": trip,
-            "overload_flag": overload,
-            "protection_event": protection_event,
-            "reset_counter": cum_resets,
-            "pwm_duty_pct": pwm,
-            "device_status": status,
-        })
+        ch_df = pd.DataFrame(
+            {
+                "timestamp": timestamps,
+                "channel_id": ch.channel_id,
+                "current_a": current_out,
+                "voltage_v": voltage_out,
+                "temperature_c": temperature,
+                "state_on_off": state,
+                "trip_flag": trip,
+                "overload_flag": overload,
+                "protection_event": protection_event,
+                "reset_counter": cum_resets,
+                "pwm_duty_pct": pwm,
+                "device_status": status,
+            }
+        )
 
         # Build labels for fault windows
         fault_mask = fault_active != FaultType.NONE.value
         if fault_mask.any():
-            label_df = pd.DataFrame({
-                "timestamp": np.array(timestamps)[fault_mask],
-                "channel_id": ch.channel_id,
-                "fault_type": fault_active[fault_mask],
-                "severity": severity[fault_mask],
-                "description": [f"{ft} on {ch.channel_id}" for ft in fault_active[fault_mask]],
-            })
+            label_df = pd.DataFrame(
+                {
+                    "timestamp": np.array(timestamps)[fault_mask],
+                    "channel_id": ch.channel_id,
+                    "fault_type": fault_active[fault_mask],
+                    "severity": severity[fault_mask],
+                    "description": [f"{ft} on {ch.channel_id}" for ft in fault_active[fault_mask]],
+                }
+            )
         else:
-            label_df = pd.DataFrame(columns=["timestamp", "channel_id", "fault_type", "severity", "description"])
+            label_df = pd.DataFrame(
+                columns=["timestamp", "channel_id", "fault_type", "severity", "description"]
+            )
 
         return ch_df, label_df

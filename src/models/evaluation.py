@@ -94,9 +94,7 @@ def evaluate(
             ttd = (first_detection - fw["start"]).total_seconds()
 
         # Fault classification accuracy within window
-        correct_class = in_window[
-            in_window["predicted_fault"] == ft
-        ]
+        correct_class = in_window[in_window["predicted_fault"] == ft]
         class_accuracy = len(correct_class) / total if total > 0 else 0.0
 
         key = f"{ft}_{ch}"
@@ -113,7 +111,10 @@ def evaluate(
     result = {"overall": overall, "per_fault": per_fault}
     log.info(
         "Evaluation: precision=%.3f recall=%.3f F1=%.3f (%d fault windows)",
-        precision, recall, f1, len(fault_windows),
+        precision,
+        recall,
+        f1,
+        len(fault_windows),
     )
     return result
 
@@ -125,12 +126,14 @@ def _build_fault_windows(labels: pd.DataFrame) -> list[dict]:
         if ft == "none":
             continue
         grp = grp.sort_values("timestamp")
-        windows.append({
-            "channel_id": ch,
-            "fault_type": ft,
-            "start": grp["timestamp"].min(),
-            "end": grp["timestamp"].max(),
-        })
+        windows.append(
+            {
+                "channel_id": ch,
+                "fault_type": ft,
+                "start": grp["timestamp"].min(),
+                "end": grp["timestamp"].max(),
+            }
+        )
     return windows
 
 
@@ -145,8 +148,10 @@ def _match_fault_window(
     for fw in fault_windows:
         if ch != fw["channel_id"]:
             continue
-        if (fw["start"] - pd.Timedelta(seconds=tolerance_s)
-                <= ts
-                <= fw["end"] + pd.Timedelta(seconds=tolerance_s)):
+        if (
+            fw["start"] - pd.Timedelta(seconds=tolerance_s)
+            <= ts
+            <= fw["end"] + pd.Timedelta(seconds=tolerance_s)
+        ):
             return fw["fault_type"]
     return "none"

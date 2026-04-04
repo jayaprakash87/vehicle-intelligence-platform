@@ -32,9 +32,11 @@ log = get_logger(__name__)
 # Health metrics
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class IterationStats:
     """Metrics for a single loop iteration."""
+
     iteration: int = 0
     rows_ingested: int = 0
     inference_ms: float = 0.0
@@ -46,6 +48,7 @@ class IterationStats:
 @dataclass
 class RuntimeStats:
     """Cumulative metrics for the entire runtime session."""
+
     total_iterations: int = 0
     total_rows: int = 0
     total_alerts: int = 0
@@ -66,6 +69,7 @@ class RuntimeStats:
 # ---------------------------------------------------------------------------
 # Edge runtime
 # ---------------------------------------------------------------------------
+
 
 class EdgeRuntime:
     """Hardened edge runtime: buffer → features → inference → alerts."""
@@ -111,11 +115,17 @@ class EdgeRuntime:
         if cfg.flush_interval < 1:
             raise ValueError(f"flush_interval must be >= 1, got {cfg.flush_interval}")
         if cfg.max_consecutive_errors < 1:
-            raise ValueError(f"max_consecutive_errors must be >= 1, got {cfg.max_consecutive_errors}")
+            raise ValueError(
+                f"max_consecutive_errors must be >= 1, got {cfg.max_consecutive_errors}"
+            )
         if cfg.alert_cooldown_s < 0:
             raise ValueError(f"alert_cooldown_s must be >= 0, got {cfg.alert_cooldown_s}")
-        log.info("Config validated: batch=%d, flush=%d, max_err=%d",
-                 cfg.batch_size, cfg.flush_interval, cfg.max_consecutive_errors)
+        log.info(
+            "Config validated: batch=%d, flush=%d, max_err=%d",
+            cfg.batch_size,
+            cfg.flush_interval,
+            cfg.max_consecutive_errors,
+        )
 
     # ------------------------------------------------------------------
     # Signal handling
@@ -224,6 +234,7 @@ class EdgeRuntime:
         try:
             # Unix: read /proc/self/status or use resource module
             import resource
+
             usage = resource.getrusage(resource.RUSAGE_SELF)
             return usage.ru_maxrss / 1024  # macOS reports bytes, Linux reports KB
         except Exception:
@@ -269,7 +280,7 @@ class EdgeRuntime:
 
                     # Score the new batch
                     scored = self.pipeline.run_streaming(
-                        self._buffer.iloc[:-len(batch_df)],
+                        self._buffer.iloc[: -len(batch_df)],
                         batch_df,
                     )
 
@@ -289,14 +300,17 @@ class EdgeRuntime:
                             iter_alerts += 1
                             log.warning(
                                 "ALERT: %s on %s (score=%.2f)",
-                                alert["fault"], alert["channel_id"], alert["score"],
+                                alert["fault"],
+                                alert["channel_id"],
+                                alert["score"],
                             )
                             for sink in self.alert_sinks:
                                 try:
                                     sink.publish(alert)
                                 except Exception as exc:
-                                    log.warning("Alert sink %s failed: %s",
-                                                type(sink).__name__, exc)
+                                    log.warning(
+                                        "Alert sink %s failed: %s", type(sink).__name__, exc
+                                    )
 
                     # Reset consecutive error counter on success
                     self._consecutive_errors = 0
@@ -306,8 +320,10 @@ class EdgeRuntime:
                     self.stats.total_errors += 1
                     log.error(
                         "Iteration %d error (%d/%d consecutive): %s",
-                        iteration, self._consecutive_errors,
-                        self.cfg.max_consecutive_errors, exc,
+                        iteration,
+                        self._consecutive_errors,
+                        self.cfg.max_consecutive_errors,
+                        exc,
                     )
                     if self._consecutive_errors >= self.cfg.max_consecutive_errors:
                         log.critical(
@@ -339,8 +355,12 @@ class EdgeRuntime:
 
                 log.debug(
                     "iter=%d  rows=%d  infer=%.1fms  alerts=%d  buf=%d  rss=%.1fMB",
-                    iteration, len(batch), iter_ms, iter_alerts,
-                    len(self._buffer), iter_stat.memory_rss_mb,
+                    iteration,
+                    len(batch),
+                    iter_ms,
+                    iter_alerts,
+                    len(self._buffer),
+                    iter_stat.memory_rss_mb,
                 )
 
                 # --- Heartbeat ---
@@ -369,8 +389,10 @@ class EdgeRuntime:
 
         log.info(
             "Edge runtime stopped — %d alerts, %d iterations, %.0f ms avg inference, %d errors",
-            len(self._alerts), self.stats.total_iterations,
-            self.stats.avg_inference_ms, self.stats.total_errors,
+            len(self._alerts),
+            self.stats.total_iterations,
+            self.stats.avg_inference_ms,
+            self.stats.total_errors,
         )
         return self._alerts
 

@@ -49,6 +49,7 @@ def _new_run_id() -> str:
 # JSON formatter
 # ---------------------------------------------------------------------------
 
+
 class _JSONFormatter(logging.Formatter):
     """Emits one JSON object per log line — ready for log aggregation."""
 

@@ -16,6 +16,7 @@ from src.transport.alert_sinks import AlertSinkBase, LogAlertSink, MqttAlertSink
 # Sample alert fixture
 # ---------------------------------------------------------------------------
 
+
 def _sample_alert(**overrides) -> dict:
     defaults = {
         "timestamp": "2026-04-04T12:00:00+00:00",
@@ -32,6 +33,7 @@ def _sample_alert(**overrides) -> dict:
 # ---------------------------------------------------------------------------
 # LogAlertSink
 # ---------------------------------------------------------------------------
+
 
 class TestLogAlertSink:
     def test_publish_logs_warning(self, caplog):
@@ -59,6 +61,7 @@ class TestLogAlertSink:
 # MqttAlertSink (mocked — no real broker needed)
 # ---------------------------------------------------------------------------
 
+
 class TestMqttAlertSink:
     def test_publish_calls_mqtt_client(self):
         """MqttAlertSink.publish should call client.publish with correct topic."""
@@ -71,7 +74,10 @@ class TestMqttAlertSink:
         mock_mqtt_module.Client = mock_client_class
         mock_mqtt_module.CallbackAPIVersion.VERSION2 = 2
 
-        with patch.dict("sys.modules", {"paho": MagicMock(), "paho.mqtt": MagicMock(), "paho.mqtt.client": mock_mqtt_module}):
+        with patch.dict(
+            "sys.modules",
+            {"paho": MagicMock(), "paho.mqtt": MagicMock(), "paho.mqtt.client": mock_mqtt_module},
+        ):
             sink = MqttAlertSink(broker_host="testhost", broker_port=1883, topic_prefix="vip/test")
             # Simulate connected state
             sink._connected = True
@@ -114,6 +120,7 @@ class TestMqttAlertSink:
 # MqttConfig
 # ---------------------------------------------------------------------------
 
+
 class TestMqttConfig:
     def test_defaults(self):
         cfg = MqttConfig()
@@ -135,6 +142,7 @@ class TestMqttConfig:
 # Edge runtime with alert sinks
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeRuntimeSinks:
     def test_alerts_published_to_sinks(self):
         """EdgeRuntime should call publish() on all alert sinks for each alert."""
@@ -146,18 +154,20 @@ class TestEdgeRuntimeSinks:
         n = 100
         t0 = datetime.now(tz=timezone.utc)
         # Create data with high spikes to trigger anomalies
-        df = pd.DataFrame({
-            "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
-            "channel_id": "ch_01",
-            "current_a": np.concatenate([rng.normal(5.0, 0.1, 50), rng.normal(25.0, 2.0, 50)]),
-            "voltage_v": 13.5,
-            "temperature_c": 40.0,
-            "state_on_off": True,
-            "trip_flag": [False] * 50 + [True] * 50,
-            "overload_flag": [False] * 50 + [True] * 50,
-            "reset_counter": 0,
-            "pwm_duty_pct": 100.0,
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
+                "channel_id": "ch_01",
+                "current_a": np.concatenate([rng.normal(5.0, 0.1, 50), rng.normal(25.0, 2.0, 50)]),
+                "voltage_v": 13.5,
+                "temperature_c": 40.0,
+                "state_on_off": True,
+                "trip_flag": [False] * 50 + [True] * 50,
+                "overload_flag": [False] * 50 + [True] * 50,
+                "reset_counter": 0,
+                "pwm_duty_pct": 100.0,
+            }
+        )
 
         mock_sink = MagicMock(spec=AlertSinkBase)
         transport = DataFrameTransport(df)
@@ -188,18 +198,20 @@ class TestEdgeRuntimeSinks:
         rng = np.random.default_rng(42)
         n = 100
         t0 = datetime.now(tz=timezone.utc)
-        df = pd.DataFrame({
-            "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
-            "channel_id": "ch_01",
-            "current_a": np.concatenate([rng.normal(5.0, 0.1, 50), rng.normal(25.0, 2.0, 50)]),
-            "voltage_v": 13.5,
-            "temperature_c": 40.0,
-            "state_on_off": True,
-            "trip_flag": [False] * 50 + [True] * 50,
-            "overload_flag": [False] * 50 + [True] * 50,
-            "reset_counter": 0,
-            "pwm_duty_pct": 100.0,
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
+                "channel_id": "ch_01",
+                "current_a": np.concatenate([rng.normal(5.0, 0.1, 50), rng.normal(25.0, 2.0, 50)]),
+                "voltage_v": 13.5,
+                "temperature_c": 40.0,
+                "state_on_off": True,
+                "trip_flag": [False] * 50 + [True] * 50,
+                "overload_flag": [False] * 50 + [True] * 50,
+                "reset_counter": 0,
+                "pwm_duty_pct": 100.0,
+            }
+        )
 
         # Sink that always raises
         failing_sink = MagicMock(spec=AlertSinkBase)

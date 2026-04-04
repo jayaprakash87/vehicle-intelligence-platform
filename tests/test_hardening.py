@@ -21,21 +21,24 @@ from src.transport.mock_can import DataFrameTransport
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_telemetry(n: int, seed: int = 42) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     t0 = datetime.now(tz=timezone.utc)
-    return pd.DataFrame({
-        "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
-        "channel_id": "ch_01",
-        "current_a": rng.normal(5.0, 0.1, n),
-        "voltage_v": 13.5,
-        "temperature_c": 40.0 + rng.normal(0, 0.5, n),
-        "state_on_off": True,
-        "trip_flag": False,
-        "overload_flag": False,
-        "reset_counter": 0,
-        "pwm_duty_pct": 100.0,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
+            "channel_id": "ch_01",
+            "current_a": rng.normal(5.0, 0.1, n),
+            "voltage_v": 13.5,
+            "temperature_c": 40.0 + rng.normal(0, 0.5, n),
+            "state_on_off": True,
+            "trip_flag": False,
+            "overload_flag": False,
+            "reset_counter": 0,
+            "pwm_duty_pct": 100.0,
+        }
+    )
 
 
 def _runtime(df, tmp_path=None, **edge_kw):
@@ -54,6 +57,7 @@ def _runtime(df, tmp_path=None, **edge_kw):
 # ---------------------------------------------------------------------------
 # 1. Config validation
 # ---------------------------------------------------------------------------
+
 
 class TestConfigValidation:
     def test_zero_batch_size_rejected(self):
@@ -78,6 +82,7 @@ class TestConfigValidation:
 # ---------------------------------------------------------------------------
 # 2. Exception resilience
 # ---------------------------------------------------------------------------
+
 
 class TestExceptionResilience:
     def test_transient_error_does_not_crash(self):
@@ -116,6 +121,7 @@ class TestExceptionResilience:
 # 3. Per-iteration health metrics
 # ---------------------------------------------------------------------------
 
+
 class TestHealthMetrics:
     def test_stats_populated_after_run(self):
         df = _make_telemetry(100)
@@ -151,6 +157,7 @@ class TestHealthMetrics:
 # 4. Alert rate-limiting
 # ---------------------------------------------------------------------------
 
+
 class TestAlertRateLimiting:
     def test_duplicate_alerts_suppressed(self):
         """Same channel+fault within cooldown window should be suppressed."""
@@ -177,6 +184,7 @@ class TestAlertRateLimiting:
 # ---------------------------------------------------------------------------
 # 5. Disk space guard
 # ---------------------------------------------------------------------------
+
 
 class TestDiskSpaceGuard:
     def test_check_disk_space_returns_true_normally(self, tmp_path):
@@ -212,6 +220,7 @@ class TestDiskSpaceGuard:
 # 6. Heartbeat checkpoint
 # ---------------------------------------------------------------------------
 
+
 class TestHeartbeat:
     def test_heartbeat_file_created(self, tmp_path):
         df = _make_telemetry(200)
@@ -235,6 +244,7 @@ class TestHeartbeat:
 # ---------------------------------------------------------------------------
 # 7. Model hot-reload
 # ---------------------------------------------------------------------------
+
 
 class TestModelHotReload:
     def test_reload_triggered_on_mtime_change(self, tmp_path):
@@ -265,6 +275,7 @@ class TestModelHotReload:
 # 8. Signal handling
 # ---------------------------------------------------------------------------
 
+
 class TestSignalHandling:
     def test_signal_handler_installed_and_restored(self):
         df = _make_telemetry(50)
@@ -288,6 +299,7 @@ class TestSignalHandling:
 # ---------------------------------------------------------------------------
 # 9. RuntimeStats dataclass
 # ---------------------------------------------------------------------------
+
 
 class TestRuntimeStats:
     def test_defaults(self):

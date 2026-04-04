@@ -29,6 +29,7 @@ from src.config.models import FeatureConfig, NormalizerConfig
 # eFuse catalog
 # ---------------------------------------------------------------------------
 
+
 class TestEFuseCatalog:
     def test_all_families_have_profiles(self):
         """Every EFuseFamily enum value must have a catalog entry."""
@@ -75,6 +76,7 @@ class TestEFuseCatalog:
 # Vehicle topology
 # ---------------------------------------------------------------------------
 
+
 class TestSedanTopology:
     def test_sedan_has_52_channels(self):
         zones, specs = sedan_topology()
@@ -115,6 +117,7 @@ class TestSedanTopology:
 # Channel factory (build_channels)
 # ---------------------------------------------------------------------------
 
+
 class TestBuildChannels:
     def test_builds_full_channel_list(self):
         zones, specs = sedan_topology()
@@ -125,7 +128,14 @@ class TestBuildChannels:
     def test_inherits_catalog_defaults(self):
         """Channel without overrides should get catalog profile values."""
         zones = [ZoneController(zone_id="z1", name="Test")]
-        specs = [{"channel_id": "ch_test", "zone_id": "z1", "efuse_family": "hs_10a", "load_name": "test_load"}]
+        specs = [
+            {
+                "channel_id": "ch_test",
+                "zone_id": "z1",
+                "efuse_family": "hs_10a",
+                "load_name": "test_load",
+            }
+        ]
         channels = build_channels(zones, specs)
         ch = channels[0]
         profile = get_profile(EFuseFamily.HS_10A)
@@ -137,32 +147,38 @@ class TestBuildChannels:
     def test_spec_overrides_catalog(self):
         """Explicit per-channel values override catalog defaults."""
         zones = [ZoneController(zone_id="z1", name="Test")]
-        specs = [{
-            "channel_id": "ch_test",
-            "zone_id": "z1",
-            "efuse_family": "hs_10a",
-            "load_name": "test_load",
-            "nominal_current_a": 7.5,  # override catalog's 6.0
-        }]
+        specs = [
+            {
+                "channel_id": "ch_test",
+                "zone_id": "z1",
+                "efuse_family": "hs_10a",
+                "load_name": "test_load",
+                "nominal_current_a": 7.5,  # override catalog's 6.0
+            }
+        ]
         channels = build_channels(zones, specs)
         assert channels[0].nominal_current_a == 7.5
 
     def test_inherits_zone_protocol(self):
         """Channel should inherit source_protocol from its zone controller."""
         zones = [ZoneController(zone_id="z1", name="XCP Zone", bus_interface=SourceProtocol.XCP)]
-        specs = [{"channel_id": "ch_test", "zone_id": "z1", "efuse_family": "hs_5a", "load_name": "test"}]
+        specs = [
+            {"channel_id": "ch_test", "zone_id": "z1", "efuse_family": "hs_5a", "load_name": "test"}
+        ]
         channels = build_channels(zones, specs)
         assert channels[0].source_protocol == SourceProtocol.XCP
 
     def test_connected_loads_preserved(self):
         zones = [ZoneController(zone_id="z1")]
-        specs = [{
-            "channel_id": "ch_test",
-            "zone_id": "z1",
-            "efuse_family": "hs_30a",
-            "load_name": "seat_heater",
-            "connected_loads": ["seat_heater_left", "lumbar_support"],
-        }]
+        specs = [
+            {
+                "channel_id": "ch_test",
+                "zone_id": "z1",
+                "efuse_family": "hs_30a",
+                "load_name": "seat_heater",
+                "connected_loads": ["seat_heater_left", "lumbar_support"],
+            }
+        ]
         channels = build_channels(zones, specs)
         assert channels[0].connected_loads == ["seat_heater_left", "lumbar_support"]
 
@@ -177,7 +193,14 @@ class TestBuildChannels:
     def test_propagates_thermal_shutdown_c(self):
         """build_channels should propagate thermal_shutdown_c from catalog."""
         zones = [ZoneController(zone_id="z1", name="Test")]
-        specs = [{"channel_id": "ch_test", "zone_id": "z1", "efuse_family": "hs_10a", "load_name": "test"}]
+        specs = [
+            {
+                "channel_id": "ch_test",
+                "zone_id": "z1",
+                "efuse_family": "hs_10a",
+                "load_name": "test",
+            }
+        ]
         channels = build_channels(zones, specs)
         ch = channels[0]
         profile = get_profile(EFuseFamily.HS_10A)
@@ -188,9 +211,11 @@ class TestBuildChannels:
 # Config loading with topology
 # ---------------------------------------------------------------------------
 
+
 class TestTopologyConfig:
     def test_load_sedan_config(self):
         from pathlib import Path
+
         cfg_path = Path(__file__).parent.parent / "configs" / "sedan_52ch.yaml"
         if not cfg_path.exists():
             pytest.skip("sedan_52ch.yaml not found")
@@ -201,6 +226,7 @@ class TestTopologyConfig:
     def test_unknown_topology_raises(self):
         cfg = SimulationConfig(vehicle_topology="suv")
         from src.config.models import PlatformConfig, _resolve_topology
+
         platform = PlatformConfig(simulation=cfg)
         with pytest.raises(ValueError, match="Unknown vehicle_topology"):
             _resolve_topology(platform)
@@ -209,6 +235,7 @@ class TestTopologyConfig:
 # ---------------------------------------------------------------------------
 # Fleet-scale generation (52 channels)
 # ---------------------------------------------------------------------------
+
 
 class TestFleetScaleGeneration:
     def test_generate_52_channels(self):
@@ -254,11 +281,24 @@ class TestFleetScaleGeneration:
     def test_52ch_with_faults(self):
         """Generate with faults injected across multiple zones."""
         from src.schemas.telemetry import FaultInjection, FaultType
+
         zones, specs = sedan_topology()
         channels = build_channels(zones, specs)
         faults = [
-            FaultInjection(channel_id="ch_017", fault_type=FaultType.OVERLOAD_SPIKE, start_s=1.0, duration_s=1.0, intensity=0.8),
-            FaultInjection(channel_id="ch_041", fault_type=FaultType.VOLTAGE_SAG, start_s=2.0, duration_s=1.0, intensity=0.7),
+            FaultInjection(
+                channel_id="ch_017",
+                fault_type=FaultType.OVERLOAD_SPIKE,
+                start_s=1.0,
+                duration_s=1.0,
+                intensity=0.8,
+            ),
+            FaultInjection(
+                channel_id="ch_041",
+                fault_type=FaultType.VOLTAGE_SAG,
+                start_s=2.0,
+                duration_s=1.0,
+                intensity=0.7,
+            ),
         ]
         cfg = SimulationConfig(
             duration_s=5.0,
@@ -277,6 +317,7 @@ class TestFleetScaleGeneration:
 # IO attributes — system hierarchy, driver type, power class, PWM
 # ---------------------------------------------------------------------------
 
+
 class TestIOAttributes:
     """Verify the sedan topology populates the new IO-level fields."""
 
@@ -284,7 +325,9 @@ class TestIOAttributes:
         zones, specs = sedan_topology()
         channels = build_channels(zones, specs)
         for ch in channels:
-            assert ch.system_cluster != "", f"{ch.channel_id} ({ch.load_name}) missing system_cluster"
+            assert ch.system_cluster != "", (
+                f"{ch.channel_id} ({ch.load_name}) missing system_cluster"
+            )
 
     def test_all_channels_have_system_name(self):
         zones, specs = sedan_topology()
@@ -298,8 +341,12 @@ class TestIOAttributes:
         channels = build_channels(zones, specs)
         clusters = {ch.system_cluster for ch in channels}
         expected = {
-            "interior_lighting", "exterior_lighting", "body_comfort",
-            "driver_assist", "adas", "powertrain",
+            "interior_lighting",
+            "exterior_lighting",
+            "body_comfort",
+            "driver_assist",
+            "adas",
+            "powertrain",
         }
         assert clusters == expected, f"Unexpected clusters: {clusters - expected}"
 
@@ -379,6 +426,7 @@ class TestIOAttributes:
 # ---------------------------------------------------------------------------
 # Schema additions
 # ---------------------------------------------------------------------------
+
 
 class TestSchemaAdditions:
     def test_efuse_family_enum_values(self):

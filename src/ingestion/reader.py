@@ -24,6 +24,7 @@ log = get_logger(__name__)
 # Column mapping config
 # ---------------------------------------------------------------------------
 
+
 class ColumnMapping(BaseModel):
     """Maps OEM / test-bench signal names to VIP canonical columns.
 
@@ -92,7 +93,9 @@ class MeasurementReader:
         elif suffix == ".parquet":
             raw = self._read_parquet(path)
         else:
-            raise ValueError(f"Unsupported file format: {suffix}  (expected .mf4, .mdf, .csv, .parquet)")
+            raise ValueError(
+                f"Unsupported file format: {suffix}  (expected .mf4, .mdf, .csv, .parquet)"
+            )
 
         df = self._apply_mapping(raw)
         log.info("Loaded %d rows from %s (%d columns mapped)", len(df), path.name, len(df.columns))
@@ -167,7 +170,9 @@ class MeasurementReader:
             elif vip_col in _COLUMN_DEFAULTS:
                 result[vip_col] = _COLUMN_DEFAULTS[vip_col]
             else:
-                log.warning("Column '%s' (mapped from '%s') not found — will be NaN", vip_col, src_col)
+                log.warning(
+                    "Column '%s' (mapped from '%s') not found — will be NaN", vip_col, src_col
+                )
                 result[vip_col] = np.nan
 
         # Ensure timestamp is datetime
@@ -185,7 +190,9 @@ class MeasurementReader:
                 result[col] = result[col].astype(bool)
 
         if "reset_counter" in result.columns:
-            result["reset_counter"] = pd.to_numeric(result["reset_counter"], errors="coerce").fillna(0).astype(int)
+            result["reset_counter"] = (
+                pd.to_numeric(result["reset_counter"], errors="coerce").fillna(0).astype(int)
+            )
 
         return result
 
@@ -247,6 +254,8 @@ class MeasurementReader:
 
         log.info(
             "Multi-channel read: %d channels, %d total rows from %s",
-            len(channel_signals), len(combined), path.name,
+            len(channel_signals),
+            len(combined),
+            path.name,
         )
         return combined

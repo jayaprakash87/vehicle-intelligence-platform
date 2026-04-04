@@ -25,6 +25,7 @@ from src.transport.mock_can import CanTransport, DataFrameTransport, XcpTranspor
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_multi_rate_df(
     fast_interval_ms: float = 10.0,
     slow_interval_ms: float = 50.0,
@@ -37,36 +38,40 @@ def _make_multi_rate_df(
     # Fast channel
     n_fast = int(duration_s / (fast_interval_ms / 1000))
     for i in range(n_fast):
-        rows.append({
-            "timestamp": t0 + timedelta(milliseconds=i * fast_interval_ms),
-            "channel_id": "ch_fast",
-            "current_a": 5.0 + np.random.normal(0, 0.1),
-            "voltage_v": 13.5,
-            "temperature_c": 35.0,
-            "state_on_off": True,
-            "trip_flag": False,
-            "overload_flag": False,
-            "reset_counter": 0,
-            "pwm_duty_pct": 100.0,
-            "device_status": "OK",
-        })
+        rows.append(
+            {
+                "timestamp": t0 + timedelta(milliseconds=i * fast_interval_ms),
+                "channel_id": "ch_fast",
+                "current_a": 5.0 + np.random.normal(0, 0.1),
+                "voltage_v": 13.5,
+                "temperature_c": 35.0,
+                "state_on_off": True,
+                "trip_flag": False,
+                "overload_flag": False,
+                "reset_counter": 0,
+                "pwm_duty_pct": 100.0,
+                "device_status": "OK",
+            }
+        )
 
     # Slow channel
     n_slow = int(duration_s / (slow_interval_ms / 1000))
     for i in range(n_slow):
-        rows.append({
-            "timestamp": t0 + timedelta(milliseconds=i * slow_interval_ms),
-            "channel_id": "ch_slow",
-            "current_a": 10.0 + np.random.normal(0, 0.1),
-            "voltage_v": 13.5,
-            "temperature_c": 45.0,
-            "state_on_off": True,
-            "trip_flag": False,
-            "overload_flag": False,
-            "reset_counter": 0,
-            "pwm_duty_pct": 100.0,
-            "device_status": "OK",
-        })
+        rows.append(
+            {
+                "timestamp": t0 + timedelta(milliseconds=i * slow_interval_ms),
+                "channel_id": "ch_slow",
+                "current_a": 10.0 + np.random.normal(0, 0.1),
+                "voltage_v": 13.5,
+                "temperature_c": 45.0,
+                "state_on_off": True,
+                "trip_flag": False,
+                "overload_flag": False,
+                "reset_counter": 0,
+                "pwm_duty_pct": 100.0,
+                "device_status": "OK",
+            }
+        )
 
     return pd.DataFrame(rows)
 
@@ -74,6 +79,7 @@ def _make_multi_rate_df(
 # ---------------------------------------------------------------------------
 # FeatureConfig.resolve()
 # ---------------------------------------------------------------------------
+
 
 class TestFeatureConfigResolve:
     """Time-based window computation."""
@@ -118,6 +124,7 @@ class TestFeatureConfigResolve:
 # ---------------------------------------------------------------------------
 # NormalizerConfig & time-based ffill
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizerMultiRate:
     """Multi-rate normalizer behavior."""
@@ -183,6 +190,7 @@ class TestNormalizerMultiRate:
 # Generator per-channel intervals
 # ---------------------------------------------------------------------------
 
+
 class TestGeneratorMultiRate:
     """Per-channel sample intervals in generator."""
 
@@ -192,8 +200,18 @@ class TestGeneratorMultiRate:
             duration_s=1.0,
             sample_interval_ms=100.0,
             channels=[
-                ChannelMeta(channel_id="fast_ch", sample_interval_ms=10.0, nominal_current_a=5.0, max_current_a=10.0),
-                ChannelMeta(channel_id="slow_ch", sample_interval_ms=50.0, nominal_current_a=8.0, max_current_a=15.0),
+                ChannelMeta(
+                    channel_id="fast_ch",
+                    sample_interval_ms=10.0,
+                    nominal_current_a=5.0,
+                    max_current_a=10.0,
+                ),
+                ChannelMeta(
+                    channel_id="slow_ch",
+                    sample_interval_ms=50.0,
+                    nominal_current_a=8.0,
+                    max_current_a=15.0,
+                ),
             ],
             seed=42,
         )
@@ -203,7 +221,7 @@ class TestGeneratorMultiRate:
         fast_rows = telem_df[telem_df["channel_id"] == "fast_ch"]
         slow_rows = telem_df[telem_df["channel_id"] == "slow_ch"]
         assert len(fast_rows) == 100  # 1s / 10ms
-        assert len(slow_rows) == 20   # 1s / 50ms
+        assert len(slow_rows) == 20  # 1s / 50ms
 
     def test_fallback_to_global_interval(self):
         """Channels without explicit interval use global default."""
@@ -222,6 +240,7 @@ class TestGeneratorMultiRate:
     def test_xcp_dual_raster_config(self):
         """XCP test bench config loads and produces multi-rate data."""
         from pathlib import Path
+
         cfg_path = Path(__file__).parent.parent / "configs" / "xcp_test_bench.yaml"
         if not cfg_path.exists():
             pytest.skip("xcp_test_bench.yaml not found")
@@ -239,6 +258,7 @@ class TestGeneratorMultiRate:
 # ---------------------------------------------------------------------------
 # Feature engine with time-based windowing
 # ---------------------------------------------------------------------------
+
 
 class TestFeatureEngineMultiRate:
     """Feature engine auto-scales windows based on sample interval."""
@@ -265,6 +285,7 @@ class TestFeatureEngineMultiRate:
 # ---------------------------------------------------------------------------
 # Transport protocol tagging
 # ---------------------------------------------------------------------------
+
 
 class TestProtocolTransports:
     """XCP and CAN transport protocol tagging."""
@@ -294,6 +315,7 @@ class TestProtocolTransports:
 # SourceProtocol schema
 # ---------------------------------------------------------------------------
 
+
 class TestSourceProtocol:
     def test_enum_values(self):
         assert SourceProtocol.CAN.value == "can"
@@ -321,6 +343,7 @@ class TestSourceProtocol:
 # Integration: multi-rate end-to-end
 # ---------------------------------------------------------------------------
 
+
 class TestMultiRateIntegration:
     """End-to-end: generate multi-rate → normalize → resample → features."""
 
@@ -329,8 +352,18 @@ class TestMultiRateIntegration:
             duration_s=5.0,
             sample_interval_ms=10.0,
             channels=[
-                ChannelMeta(channel_id="xcp_fast", sample_interval_ms=10.0, nominal_current_a=5.0, max_current_a=10.0),
-                ChannelMeta(channel_id="xcp_slow", sample_interval_ms=50.0, nominal_current_a=8.0, max_current_a=15.0),
+                ChannelMeta(
+                    channel_id="xcp_fast",
+                    sample_interval_ms=10.0,
+                    nominal_current_a=5.0,
+                    max_current_a=10.0,
+                ),
+                ChannelMeta(
+                    channel_id="xcp_slow",
+                    sample_interval_ms=50.0,
+                    nominal_current_a=8.0,
+                    max_current_a=15.0,
+                ),
             ],
             seed=42,
         )

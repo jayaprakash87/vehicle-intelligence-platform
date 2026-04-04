@@ -69,11 +69,16 @@ def test_inference_result_defaults():
 # EFuseProfile — dual ADC, F(i,t), supply voltage, safety level
 # ---------------------------------------------------------------------------
 
+
 def test_efuse_profile_dual_adc_defaults():
     p = EFuseProfile(
         efuse_family=EFuseFamily.HS_10A,
-        nominal_current_a=6.0, max_current_a=15.0, fuse_rating_a=10.0,
-        r_ds_on_ohm=0.025, r_thermal_kw=40.0, tau_thermal_s=15.0,
+        nominal_current_a=6.0,
+        max_current_a=15.0,
+        fuse_rating_a=10.0,
+        r_ds_on_ohm=0.025,
+        r_thermal_kw=40.0,
+        tau_thermal_s=15.0,
     )
     assert p.current_adc_bits == 12
     assert p.voltage_adc_bits == 10
@@ -82,9 +87,14 @@ def test_efuse_profile_dual_adc_defaults():
 def test_efuse_profile_custom_adc():
     p = EFuseProfile(
         efuse_family=EFuseFamily.HS_2A,
-        nominal_current_a=1.5, max_current_a=3.0, fuse_rating_a=2.5,
-        r_ds_on_ohm=0.180, r_thermal_kw=80.0, tau_thermal_s=8.0,
-        current_adc_bits=16, voltage_adc_bits=12,
+        nominal_current_a=1.5,
+        max_current_a=3.0,
+        fuse_rating_a=2.5,
+        r_ds_on_ohm=0.180,
+        r_thermal_kw=80.0,
+        tau_thermal_s=8.0,
+        current_adc_bits=16,
+        voltage_adc_bits=12,
     )
     assert p.current_adc_bits == 16
     assert p.voltage_adc_bits == 12
@@ -94,8 +104,12 @@ def test_efuse_profile_fit_threshold_default_zero():
     """fit_threshold_a2s=0 means 'auto-derive'; generator resolves it."""
     p = EFuseProfile(
         efuse_family=EFuseFamily.HS_15A,
-        nominal_current_a=10.0, max_current_a=20.0, fuse_rating_a=15.0,
-        r_ds_on_ohm=0.012, r_thermal_kw=35.0, tau_thermal_s=18.0,
+        nominal_current_a=10.0,
+        max_current_a=20.0,
+        fuse_rating_a=15.0,
+        r_ds_on_ohm=0.012,
+        r_thermal_kw=35.0,
+        tau_thermal_s=18.0,
     )
     assert p.fit_threshold_a2s == 0.0
     assert p.short_circuit_threshold_a == 0.0
@@ -104,9 +118,14 @@ def test_efuse_profile_fit_threshold_default_zero():
 def test_efuse_profile_explicit_fit_threshold():
     p = EFuseProfile(
         efuse_family=EFuseFamily.HS_30A,
-        nominal_current_a=20.0, max_current_a=40.0, fuse_rating_a=30.0,
-        r_ds_on_ohm=0.005, r_thermal_kw=25.0, tau_thermal_s=22.0,
-        fit_threshold_a2s=9.0, short_circuit_threshold_a=120.0,
+        nominal_current_a=20.0,
+        max_current_a=40.0,
+        fuse_rating_a=30.0,
+        r_ds_on_ohm=0.005,
+        r_thermal_kw=25.0,
+        tau_thermal_s=22.0,
+        fit_threshold_a2s=9.0,
+        short_circuit_threshold_a=120.0,
     )
     assert p.fit_threshold_a2s == 9.0
     assert p.short_circuit_threshold_a == 120.0
@@ -115,8 +134,12 @@ def test_efuse_profile_explicit_fit_threshold():
 def test_efuse_profile_safety_level():
     p = EFuseProfile(
         efuse_family=EFuseFamily.HS_50A,
-        nominal_current_a=35.0, max_current_a=65.0, fuse_rating_a=50.0,
-        r_ds_on_ohm=0.003, r_thermal_kw=18.0, tau_thermal_s=30.0,
+        nominal_current_a=35.0,
+        max_current_a=65.0,
+        fuse_rating_a=50.0,
+        r_ds_on_ohm=0.003,
+        r_thermal_kw=18.0,
+        tau_thermal_s=30.0,
         safety_level=SafetyLevel.ASIL_B,
     )
     assert p.safety_level == SafetyLevel.ASIL_B
@@ -130,6 +153,7 @@ def test_safety_level_enum_values():
 # ---------------------------------------------------------------------------
 # ChannelMeta — dual ADC + protection fields
 # ---------------------------------------------------------------------------
+
 
 def test_channel_meta_dual_adc():
     ch = ChannelMeta(channel_id="ch_001", current_adc_bits=16, voltage_adc_bits=10)
@@ -158,6 +182,7 @@ def test_channel_meta_defaults_zero_protection():
 # ProtectionEvent enum
 # ---------------------------------------------------------------------------
 
+
 def test_protection_event_enum_values():
     assert ProtectionEvent.NONE.value == "none"
     assert ProtectionEvent.SCP.value == "scp"
@@ -185,11 +210,16 @@ def test_telemetry_record_with_protection_event():
 # thermal_shutdown_c
 # ---------------------------------------------------------------------------
 
+
 def test_efuse_profile_thermal_shutdown_c_default():
     p = EFuseProfile(
         efuse_family=EFuseFamily.HS_10A,
-        nominal_current_a=6.0, max_current_a=15.0, fuse_rating_a=10.0,
-        r_ds_on_ohm=0.025, r_thermal_kw=40.0, tau_thermal_s=15.0,
+        nominal_current_a=6.0,
+        max_current_a=15.0,
+        fuse_rating_a=10.0,
+        r_ds_on_ohm=0.025,
+        r_thermal_kw=40.0,
+        tau_thermal_s=15.0,
     )
     assert p.thermal_shutdown_c == 150.0
 
@@ -197,8 +227,12 @@ def test_efuse_profile_thermal_shutdown_c_default():
 def test_efuse_profile_thermal_shutdown_c_custom():
     p = EFuseProfile(
         efuse_family=EFuseFamily.HS_10A,
-        nominal_current_a=6.0, max_current_a=15.0, fuse_rating_a=10.0,
-        r_ds_on_ohm=0.025, r_thermal_kw=40.0, tau_thermal_s=15.0,
+        nominal_current_a=6.0,
+        max_current_a=15.0,
+        fuse_rating_a=10.0,
+        r_ds_on_ohm=0.025,
+        r_thermal_kw=40.0,
+        tau_thermal_s=15.0,
         thermal_shutdown_c=175.0,
     )
     assert p.thermal_shutdown_c == 175.0

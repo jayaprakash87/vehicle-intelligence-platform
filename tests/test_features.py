@@ -11,19 +11,21 @@ from src.config.models import FeatureConfig
 def _make_telemetry(n: int = 200, channel_id: str = "ch_01") -> pd.DataFrame:
     """Create a minimal telemetry DataFrame for testing."""
     t0 = datetime.now(tz=timezone.utc)
-    return pd.DataFrame({
-        "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
-        "channel_id": channel_id,
-        "current_a": np.random.default_rng(42).normal(5.0, 0.2, n),
-        "voltage_v": np.random.default_rng(42).normal(13.5, 0.05, n),
-        "temperature_c": 25.0 + np.cumsum(np.random.default_rng(42).normal(0, 0.01, n)),
-        "state_on_off": True,
-        "trip_flag": False,
-        "overload_flag": False,
-        "reset_counter": 0,
-        "pwm_duty_pct": 100.0,
-        "device_status": "ok",
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": [t0 + timedelta(milliseconds=i * 100) for i in range(n)],
+            "channel_id": channel_id,
+            "current_a": np.random.default_rng(42).normal(5.0, 0.2, n),
+            "voltage_v": np.random.default_rng(42).normal(13.5, 0.05, n),
+            "temperature_c": 25.0 + np.cumsum(np.random.default_rng(42).normal(0, 0.01, n)),
+            "state_on_off": True,
+            "trip_flag": False,
+            "overload_flag": False,
+            "reset_counter": 0,
+            "pwm_duty_pct": 100.0,
+            "device_status": "ok",
+        }
+    )
 
 
 def test_compute_adds_feature_columns():
@@ -32,9 +34,14 @@ def test_compute_adds_feature_columns():
     result = engine.compute(df)
 
     expected_cols = [
-        "rolling_rms_current", "rolling_mean_current", "rolling_max_current",
-        "rolling_min_current", "temperature_slope", "spike_score",
-        "trip_frequency", "degradation_trend",
+        "rolling_rms_current",
+        "rolling_mean_current",
+        "rolling_max_current",
+        "rolling_min_current",
+        "temperature_slope",
+        "spike_score",
+        "trip_frequency",
+        "degradation_trend",
     ]
     for col in expected_cols:
         assert col in result.columns, f"Missing column: {col}"
@@ -57,9 +64,11 @@ def test_feature_values_reasonable():
 # Protection event features
 # ---------------------------------------------------------------------------
 
+
 def test_protection_event_features_present():
     """When protection_event column exists, event features should be added."""
     from src.schemas.telemetry import ProtectionEvent
+
     df = _make_telemetry(200)
     np.random.default_rng(99)
     # Inject some SCP and I2T events
@@ -71,14 +80,20 @@ def test_protection_event_features_present():
     df["protection_event"] = events
     engine = FeatureEngine(FeatureConfig(window_size=20, min_periods=5))
     result = engine.compute(df)
-    for col in ("protection_event_rate", "scp_count", "i2t_count",
-                "latch_off_count", "thermal_shutdown_count"):
+    for col in (
+        "protection_event_rate",
+        "scp_count",
+        "i2t_count",
+        "latch_off_count",
+        "thermal_shutdown_count",
+    ):
         assert col in result.columns, f"Missing column: {col}"
 
 
 def test_protection_event_counts_nonzero():
     """Rolling counts should reflect injected protection events."""
     from src.schemas.telemetry import ProtectionEvent
+
     df = _make_telemetry(200)
     events = [ProtectionEvent.NONE.value] * 200
     for i in range(50, 60):
@@ -95,6 +110,7 @@ def test_protection_event_counts_nonzero():
 def test_protection_event_rate_range():
     """protection_event_rate should be between 0 and 1."""
     from src.schemas.telemetry import ProtectionEvent
+
     df = _make_telemetry(200)
     events = [ProtectionEvent.NONE.value] * 200
     for i in range(100, 120):
