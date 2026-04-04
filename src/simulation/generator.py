@@ -58,7 +58,7 @@ class TelemetryGenerator:
         finest_s = finest_ms / 1000
         n_finest = int(self.cfg.duration_s / finest_s)
         bus_voltage_fine = self._generate_bus_voltage(n_finest, finest_s)
-        fine_times = np.arange(n_finest) * finest_s  # seconds from t0
+        np.arange(n_finest) * finest_s  # seconds from t0
 
         all_telem: list[pd.DataFrame] = []
         all_labels: list[pd.DataFrame] = []

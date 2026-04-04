@@ -166,10 +166,10 @@ class RulesFaultClassifier:
         trip_freq = r.get("trip_frequency", 0)
         temp_slope = r.get("temperature_slope", 0)
         deg_trend = r.get("degradation_trend", 0)
-        rms = r.get("rolling_rms_current", 0)
+        r.get("rolling_rms_current", 0)
         overload = r.get("overload_flag", False)
         trip = r.get("trip_flag", False)
-        current = r.get("current_a", 0) or 0
+        r.get("current_a", 0) or 0
         voltage = r.get("voltage_v", 0) or 0
         missing_rate = r.get("missing_rate", 0) or 0
 

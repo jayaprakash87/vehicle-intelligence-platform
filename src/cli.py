@@ -11,12 +11,16 @@ Commands:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from src.utils.logging import configure_logging, get_run_id
+from src.utils.logging import configure_logging
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 app = typer.Typer(name="vip", help="Vehicle Intelligence Platform CLI")
 console = Console(stderr=True)
@@ -61,7 +65,7 @@ def _setup(
     return cfg
 
 
-def _load_data(data_path: str) -> "pd.DataFrame":
+def _load_data(data_path: str) -> pd.DataFrame:
     """Load telemetry from parquet or CSV with a clear error on missing file."""
     import pandas as pd
 
@@ -257,7 +261,7 @@ def edge(
     from src.inference.pipeline import InferencePipeline
     from src.models.anomaly import AnomalyDetector
     from src.storage.writer import StorageWriter
-    from src.transport.alert_sinks import AlertSinkBase, LogAlertSink, MqttAlertSink
+    from src.transport.alert_sinks import AlertSinkBase, MqttAlertSink
     from src.transport.mock_can import DataFrameTransport
 
     cfg = _setup(config, output_dir, json_log=json_log)
@@ -354,7 +358,7 @@ def pipeline(
     _print_summary(scored)
 
 
-def _print_summary(scored: "pd.DataFrame") -> None:
+def _print_summary(scored: pd.DataFrame) -> None:
     """Print a rich table summarizing inference results."""
     import pandas as pd
 

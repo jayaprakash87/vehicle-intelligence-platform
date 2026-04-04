@@ -61,7 +61,7 @@ def test_protection_event_features_present():
     """When protection_event column exists, event features should be added."""
     from src.schemas.telemetry import ProtectionEvent
     df = _make_telemetry(200)
-    rng = np.random.default_rng(99)
+    np.random.default_rng(99)
     # Inject some SCP and I2T events
     events = [ProtectionEvent.NONE.value] * 200
     for i in range(50, 60):

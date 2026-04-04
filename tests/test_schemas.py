@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 
 from src.schemas.telemetry import (
     ChannelMeta,
-    DerivedFeatures,
     DeviceStatus,
     EFuseFamily,
     EFuseProfile,

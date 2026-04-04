@@ -15,7 +15,6 @@ from src.schemas.telemetry import (
     ChannelMeta,
     DriverType,
     EFuseFamily,
-    EFuseProfile,
     PowerClass,
     SourceProtocol,
     ZoneController,

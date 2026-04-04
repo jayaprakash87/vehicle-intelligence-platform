@@ -20,7 +20,6 @@ from src.schemas.telemetry import (
     EFuseFamily,
     EFuseProfile,
     SafetyLevel,
-    SourceProtocol,
     ZoneController,
 )
 

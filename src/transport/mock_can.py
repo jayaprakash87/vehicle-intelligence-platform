@@ -10,7 +10,6 @@ from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from enum import Enum
 
 import pandas as pd
 

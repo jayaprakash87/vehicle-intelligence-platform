@@ -5,7 +5,6 @@ from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.config.models import EdgeConfig, StorageConfig
 from src.edge.runtime import EdgeRuntime
@@ -128,7 +127,7 @@ def test_stop_mid_run():
         return _orig_batch(size)
 
     transport.batch = _counting_batch
-    alerts = runtime.run()
+    runtime.run()
     assert _call_count[0] == 3
     assert not transport.exhausted  # should not have consumed everything
 

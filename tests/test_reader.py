@@ -121,7 +121,7 @@ class TestReaderCsv:
         result = reader.read(str(csv_path))
 
         # trip_flag, protection_event, etc. should have defaults
-        assert (result["trip_flag"] == False).all()
+        assert (~result["trip_flag"]).all()
         assert (result["protection_event"] == ProtectionEvent.NONE.value).all()
         assert (result["reset_counter"] == 0).all()
         assert (result["pwm_duty_pct"] == 100.0).all()
@@ -249,7 +249,7 @@ class TestReaderMdf4:
         with patch("src.ingestion.reader.MDF", return_value=mock_mdf, create=True):
             # Patch the import inside _read_mdf4
             import src.ingestion.reader as reader_mod
-            original = getattr(reader_mod, "_mdf_import_done", False)
+            getattr(reader_mod, "_mdf_import_done", False)
             with patch.object(reader_mod, "_read_mdf4_import", create=True):
                 # Directly patch asammdf.MDF in the function's local scope
                 with patch.dict("sys.modules", {"asammdf": MagicMock(MDF=MagicMock(return_value=mock_mdf))}):

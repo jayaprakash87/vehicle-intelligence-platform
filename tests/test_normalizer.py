@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-import pytest
 from datetime import datetime, timedelta, timezone
 
 from src.ingestion.normalizer import Normalizer

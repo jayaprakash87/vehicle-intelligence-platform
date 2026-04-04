@@ -1,6 +1,5 @@
 """CLI smoke tests — verify each command runs without crashing."""
 
-import pytest
 from typer.testing import CliRunner
 
 from src.cli import app

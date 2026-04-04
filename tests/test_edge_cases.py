@@ -9,7 +9,7 @@ import pytest
 from src.features.engine import FeatureEngine
 from src.ingestion.normalizer import Normalizer
 from src.models.anomaly import AnomalyDetector, ANOMALY_FEATURES
-from src.config.models import FeatureConfig, ModelConfig
+from src.config.models import FeatureConfig
 
 
 def test_normalizer_empty_df():

@@ -10,7 +10,6 @@ alert rate-limiting, heartbeat, model hot-reload.
 from __future__ import annotations
 
 import json
-import os
 import signal
 import time
 from dataclasses import dataclass, field
@@ -282,7 +281,7 @@ class EdgeRuntime:
 
                     # Emit alerts for anomalies (with rate-limiting)
                     iter_alerts = 0
-                    anomalies = scored[scored.get("is_anomaly", pd.Series(dtype=bool)) == True]
+                    anomalies = scored[scored.get("is_anomaly", pd.Series(dtype=bool))]
                     for _, row in anomalies.iterrows():
                         alert = self._make_alert(row)
                         if self._should_emit_alert(alert["channel_id"], alert["fault"]):

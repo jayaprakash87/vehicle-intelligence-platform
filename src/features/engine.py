@@ -93,7 +93,7 @@ class FeatureEngine:
             pe = df["protection_event"]
             none_val = ProtectionEvent.NONE.value
             # Binary: any protection event active (1) or not (0)
-            pe_active = (pe != none_val).astype(int)
+            (pe != none_val).astype(int)
             df["protection_event_rate"] = df.groupby("channel_id")["protection_event"].transform(
                 lambda s: (s != none_val).astype(int).rolling(w, min_periods=1).mean()
             )

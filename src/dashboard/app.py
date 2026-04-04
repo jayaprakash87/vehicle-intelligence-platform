@@ -8,10 +8,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
 # Ensure project root is on sys.path so imports work when streamlit runs this file directly
@@ -19,20 +17,19 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from src.config.catalog import build_channels, sedan_topology
-from src.config.models import FeatureConfig, ModelConfig, PlatformConfig, SimulationConfig
-from src.features.engine import FeatureEngine
-from src.inference.pipeline import InferencePipeline
-from src.ingestion.normalizer import Normalizer
-from src.config.models import NormalizerConfig
-from src.models.anomaly import AnomalyDetector, RulesFaultClassifier
-from src.schemas.telemetry import (
+from src.config.catalog import build_channels, sedan_topology  # noqa: E402
+from src.config.models import FeatureConfig, ModelConfig, NormalizerConfig, SimulationConfig  # noqa: E402
+from src.features.engine import FeatureEngine  # noqa: E402
+from src.inference.pipeline import InferencePipeline  # noqa: E402
+from src.ingestion.normalizer import Normalizer  # noqa: E402
+from src.models.anomaly import AnomalyDetector  # noqa: E402
+from src.schemas.telemetry import (  # noqa: E402
     ChannelMeta,
     FaultInjection,
     FaultType,
     ProtectionEvent,
 )
-from src.simulation.generator import TelemetryGenerator
+from src.simulation.generator import TelemetryGenerator  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -257,7 +254,7 @@ with tab_anomaly:
         st.plotly_chart(fig_spike, use_container_width=True)
 
     if "is_anomaly" in view.columns:
-        anom_rows = view[view["is_anomaly"] == True]
+        anom_rows = view[view["is_anomaly"]]
         st.write(f"**{len(anom_rows)} anomalous rows** in selected channels")
         if len(anom_rows) > 0:
             st.dataframe(

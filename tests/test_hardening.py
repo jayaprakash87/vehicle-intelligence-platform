@@ -1,12 +1,10 @@
 """Phase D tests — edge deployment hardening features."""
 
 import json
-import os
 import signal
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
@@ -98,7 +96,7 @@ class TestExceptionResilience:
             return orig(buf, new)
 
         rt.pipeline.run_streaming = _failing_streaming
-        alerts = rt.run()
+        rt.run()
         assert rt.stats.total_errors == 1
         assert rt.stats.total_iterations >= 2  # continued past the error
 
@@ -247,7 +245,7 @@ class TestModelHotReload:
         # Create a fake model file
         model_dir = Path(rt.pipeline.anomaly_detector.cfg.model_dir)
         model_dir.mkdir(parents=True, exist_ok=True)
-        model_file = model_dir / "anomaly_detector.joblib"
+        model_dir / "anomaly_detector.joblib"
 
         # Save initial model (need trained model for hot-reload test)
         # Instead, just verify the method doesn't crash when no model exists
@@ -271,7 +269,7 @@ class TestSignalHandling:
     def test_signal_handler_installed_and_restored(self):
         df = _make_telemetry(50)
         rt, _ = _runtime(df)
-        original = signal.getsignal(signal.SIGINT)
+        signal.getsignal(signal.SIGINT)
         rt.run()
         # After run(), original handler should be restored
         restored = signal.getsignal(signal.SIGINT)

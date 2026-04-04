@@ -24,9 +24,8 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +236,10 @@ class TelemetryRecord(BaseModel):
     pwm_duty_pct: float = Field(default=100.0, ge=0.0, le=100.0, description="PWM duty %")
     device_status: DeviceStatus = DeviceStatus.OK
 
-    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+    @field_serializer("timestamp")
+    @classmethod
+    def _serialize_timestamp(cls, v: datetime) -> str:
+        return v.isoformat()
 
 
 # ---------------------------------------------------------------------------

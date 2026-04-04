@@ -285,7 +285,7 @@ class TestProtocolTransports:
         """Base DataFrameTransport doesn't add protocol tags."""
         df = _make_multi_rate_df()
         transport = DataFrameTransport(df)
-        batch = transport.batch(10)
+        transport.batch(10)
         # Original DF doesn't have source_protocol column
         assert "source_protocol" not in df.columns
 
