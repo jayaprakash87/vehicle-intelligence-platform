@@ -1,10 +1,12 @@
 """VIP Dashboard — Streamlit-based channel health monitoring.
 
 Launch:  streamlit run src/dashboard/app.py
+        vip dashboard --data output/<run_id>/
 """
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -42,39 +44,48 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------------------------
-# Sidebar — simulation controls
+# Data source — disk or simulation
 # ---------------------------------------------------------------------------
+
+_DATA_DIR = os.environ.get("VIP_DATA_DIR", "")
+_disk_mode = bool(_DATA_DIR)
 
 st.sidebar.title("⚡ VIP Dashboard")
 st.sidebar.markdown("---")
 
-topology = st.sidebar.selectbox("Vehicle topology", ["sedan (52 ch)", "minimal (3 ch)"])
-duration_s = st.sidebar.slider("Duration (s)", 5, 120, 30, step=5)
-sample_ms = st.sidebar.selectbox("Sample interval (ms)", [50, 100, 200], index=1)
-seed = st.sidebar.number_input("Random seed", value=42, min_value=0, max_value=9999)
+if _disk_mode:
+    # ---------- Disk mode ----------
+    st.sidebar.info(f"📂 Loading from:\n`{_DATA_DIR}`")
+    run_btn = False
+else:
+    # ---------- Simulation mode ----------
+    topology = st.sidebar.selectbox("Vehicle topology", ["sedan (52 ch)", "minimal (3 ch)"])
+    duration_s = st.sidebar.slider("Duration (s)", 5, 120, 30, step=5)
+    sample_ms = st.sidebar.selectbox("Sample interval (ms)", [50, 100, 200], index=1)
+    seed = st.sidebar.number_input("Random seed", value=42, min_value=0, max_value=9999)
 
-st.sidebar.markdown("### Fault injection")
-inject_fault = st.sidebar.checkbox("Inject fault", value=True)
-if inject_fault:
-    fault_type = st.sidebar.selectbox(
-        "Fault type",
-        [f.value for f in FaultType if f != FaultType.NONE],
-        format_func=lambda x: x.replace("_", " ").title(),
-    )
-    fault_channel_idx = st.sidebar.number_input("Channel index (0-based)", value=0, min_value=0)
-    fault_start = st.sidebar.slider(
-        "Fault start (s)", 1.0, float(duration_s - 2), float(duration_s // 4), step=0.5
-    )
-    fault_duration = st.sidebar.slider(
-        "Fault duration (s)",
-        1.0,
-        float(duration_s - fault_start - 1),
-        min(5.0, float(duration_s - fault_start - 1)),
-        step=0.5,
-    )
-    fault_intensity = st.sidebar.slider("Intensity", 0.1, 1.0, 0.8, step=0.05)
+    st.sidebar.markdown("### Fault injection")
+    inject_fault = st.sidebar.checkbox("Inject fault", value=True)
+    if inject_fault:
+        fault_type = st.sidebar.selectbox(
+            "Fault type",
+            [f.value for f in FaultType if f != FaultType.NONE],
+            format_func=lambda x: x.replace("_", " ").title(),
+        )
+        fault_channel_idx = st.sidebar.number_input("Channel index (0-based)", value=0, min_value=0)
+        fault_start = st.sidebar.slider(
+            "Fault start (s)", 1.0, float(duration_s - 2), float(duration_s // 4), step=0.5
+        )
+        fault_duration = st.sidebar.slider(
+            "Fault duration (s)",
+            1.0,
+            float(duration_s - fault_start - 1),
+            min(5.0, float(duration_s - fault_start - 1)),
+            step=0.5,
+        )
+        fault_intensity = st.sidebar.slider("Intensity", 0.1, 1.0, 0.8, step=0.05)
 
-run_btn = st.sidebar.button("🚀 Run pipeline", type="primary", use_container_width=True)
+    run_btn = st.sidebar.button("🚀 Run pipeline", type="primary", use_container_width=True)
 
 # ---------------------------------------------------------------------------
 # Cache the full pipeline run
@@ -151,31 +162,72 @@ def run_pipeline(
 
 
 # ---------------------------------------------------------------------------
-# Run on button press or first load
+# Load data — from disk or simulation
 # ---------------------------------------------------------------------------
 
-if run_btn or "scored" not in st.session_state:
-    f_type_val = fault_type if inject_fault else None
-    f_start_val = fault_start if inject_fault else 1.0
-    f_dur_val = fault_duration if inject_fault else 3.0
-    f_int_val = fault_intensity if inject_fault else 0.8
-    f_ch_val = fault_channel_idx if inject_fault else 0
 
-    raw, scored, labels = run_pipeline(
-        topology,
-        duration_s,
-        sample_ms,
-        seed,
-        inject_fault,
-        f_type_val,
-        f_ch_val,
-        f_start_val,
-        f_dur_val,
-        f_int_val,
-    )
-    st.session_state["raw"] = raw
-    st.session_state["scored"] = scored
-    st.session_state["labels"] = labels
+def _load_from_disk(data_dir: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Load telemetry, scored, and labels from a pipeline output directory."""
+    d = Path(data_dir)
+    if not d.is_dir():
+        st.error(f"Data directory not found: {data_dir}")
+        st.stop()
+
+    scored_path = d / "scored.parquet"
+    if not scored_path.exists():
+        # Try CSV fallback
+        scored_path = d / "scored.csv"
+    if not scored_path.exists():
+        st.error(f"No scored.parquet or scored.csv in {data_dir}")
+        st.stop()
+
+    raw_path = d / "telemetry.parquet"
+    if not raw_path.exists():
+        raw_path = d / "telemetry.csv"
+
+    labels_path = d / "labels.parquet"
+    if not labels_path.exists():
+        labels_path = d / "labels.csv"
+
+    def _read(p: Path) -> pd.DataFrame:
+        if not p.exists():
+            return pd.DataFrame()
+        if p.suffix == ".parquet":
+            return pd.read_parquet(p)
+        return pd.read_csv(p, parse_dates=["timestamp"])
+
+    return _read(raw_path), _read(scored_path), _read(labels_path)
+
+
+if _disk_mode:
+    if "scored" not in st.session_state:
+        raw, scored, labels = _load_from_disk(_DATA_DIR)
+        st.session_state["raw"] = raw
+        st.session_state["scored"] = scored
+        st.session_state["labels"] = labels
+else:
+    if run_btn or "scored" not in st.session_state:
+        f_type_val = fault_type if inject_fault else None
+        f_start_val = fault_start if inject_fault else 1.0
+        f_dur_val = fault_duration if inject_fault else 3.0
+        f_int_val = fault_intensity if inject_fault else 0.8
+        f_ch_val = fault_channel_idx if inject_fault else 0
+
+        raw, scored, labels = run_pipeline(
+            topology,
+            duration_s,
+            sample_ms,
+            seed,
+            inject_fault,
+            f_type_val,
+            f_ch_val,
+            f_start_val,
+            f_dur_val,
+            f_int_val,
+        )
+        st.session_state["raw"] = raw
+        st.session_state["scored"] = scored
+        st.session_state["labels"] = labels
 
 raw: pd.DataFrame = st.session_state["raw"]
 scored: pd.DataFrame = st.session_state["scored"]

@@ -393,15 +393,33 @@ def _print_summary(scored: pd.DataFrame) -> None:
 
 
 @app.command()
-def dashboard() -> None:
+def dashboard(
+    data: str = typer.Option(
+        "", "--data", "-d", help="Path to pipeline output dir to load from disk"
+    ),
+) -> None:
     """Launch the Streamlit monitoring dashboard."""
+    import os
     import subprocess
     import sys
 
     app_path = Path(__file__).parent / "dashboard" / "app.py"
     if not app_path.exists():
         _abort(f"Dashboard app not found at {app_path}")
-    subprocess.run([sys.executable, "-m", "streamlit", "run", str(app_path)], check=False)
+
+    env = os.environ.copy()
+    if data:
+        data_path = Path(data)
+        if not data_path.is_dir():
+            _abort(f"Data directory not found: {data}")
+        env["VIP_DATA_DIR"] = str(data_path.resolve())
+        console.print(f"[dim]Dashboard loading from {data_path.resolve()}[/dim]")
+
+    subprocess.run(
+        [sys.executable, "-m", "streamlit", "run", str(app_path)],
+        env=env,
+        check=False,
+    )
 
 
 if __name__ == "__main__":
