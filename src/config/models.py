@@ -102,6 +102,22 @@ class EdgeConfig(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# MQTT config
+# ---------------------------------------------------------------------------
+
+class MqttConfig(BaseModel):
+    enabled: bool = False
+    broker_host: str = "localhost"
+    broker_port: int = 1883
+    topic_prefix: str = "vip/alerts"
+    client_id: str = ""
+    username: str = ""
+    password: str = ""
+    qos: int = 1
+    tls: bool = False
+
+
+# ---------------------------------------------------------------------------
 # Normalizer config
 # ---------------------------------------------------------------------------
 
@@ -131,6 +147,7 @@ class PlatformConfig(BaseModel):
     storage: StorageConfig = Field(default_factory=StorageConfig)
     edge: EdgeConfig = Field(default_factory=EdgeConfig)
     normalizer: NormalizerConfig = Field(default_factory=NormalizerConfig)
+    mqtt: MqttConfig = Field(default_factory=MqttConfig)
 
 
 # ---------------------------------------------------------------------------

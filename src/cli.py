@@ -173,6 +173,10 @@ def edge(
     data_path: str = typer.Option("output/telemetry.parquet", "--data", "-d"),
     output_dir: str = typer.Option("output", "--output", "-o"),
     max_iter: int = typer.Option(0, "--max-iter", help="Max batches (0=unlimited)"),
+    mqtt: bool = typer.Option(False, "--mqtt", help="Enable MQTT alert publishing"),
+    mqtt_broker: str = typer.Option("localhost", "--mqtt-broker", help="MQTT broker host"),
+    mqtt_port: int = typer.Option(1883, "--mqtt-port", help="MQTT broker port"),
+    mqtt_topic: str = typer.Option("vip/alerts", "--mqtt-topic", help="MQTT topic prefix"),
     json_log: bool = typer.Option(False, "--json-log", help="Emit structured JSON logs"),
 ) -> None:
     """Run the edge runtime loop over telemetry data."""
@@ -180,6 +184,7 @@ def edge(
     from src.inference.pipeline import InferencePipeline
     from src.models.anomaly import AnomalyDetector
     from src.storage.writer import StorageWriter
+    from src.transport.alert_sinks import AlertSinkBase, LogAlertSink, MqttAlertSink
     from src.transport.mock_can import DataFrameTransport
 
     cfg = _setup(config, output_dir, json_log=json_log)
@@ -190,10 +195,30 @@ def edge(
     if model_file.exists():
         detector.load()
 
+    # Build alert sinks
+    sinks: list[AlertSinkBase] = []
+    mqtt_enabled = mqtt or cfg.mqtt.enabled
+    if mqtt_enabled:
+        host = mqtt_broker if mqtt else cfg.mqtt.broker_host
+        port = mqtt_port if mqtt else cfg.mqtt.broker_port
+        topic = mqtt_topic if mqtt else cfg.mqtt.topic_prefix
+        sink = MqttAlertSink(
+            broker_host=host,
+            broker_port=port,
+            topic_prefix=topic,
+            client_id=cfg.mqtt.client_id,
+            username=cfg.mqtt.username,
+            password=cfg.mqtt.password,
+            qos=cfg.mqtt.qos,
+            tls=cfg.mqtt.tls,
+        )
+        sinks.append(sink)
+        console.print(f"[dim]MQTT sink → {host}:{port}/{topic}[/dim]")
+
     transport = DataFrameTransport(df)
     pipeline = InferencePipeline(cfg.features, cfg.model, detector)
     writer = StorageWriter(cfg.storage)
-    runtime = EdgeRuntime(transport, pipeline, cfg.edge, writer)
+    runtime = EdgeRuntime(transport, pipeline, cfg.edge, writer, alert_sinks=sinks)
 
     mi = max_iter if max_iter > 0 else None
     alerts = runtime.run(max_iterations=mi)

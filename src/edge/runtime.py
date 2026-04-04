@@ -22,6 +22,7 @@ import pandas as pd
 from src.config.models import EdgeConfig
 from src.inference.pipeline import InferencePipeline
 from src.storage.writer import StorageWriter
+from src.transport.alert_sinks import AlertSinkBase
 from src.transport.mock_can import TransportBase
 from src.utils.logging import get_logger
 
@@ -76,11 +77,13 @@ class EdgeRuntime:
         pipeline: InferencePipeline,
         edge_config: EdgeConfig | None = None,
         writer: StorageWriter | None = None,
+        alert_sinks: list[AlertSinkBase] | None = None,
     ) -> None:
         self.transport = transport
         self.pipeline = pipeline
         self.cfg = edge_config or EdgeConfig()
         self.writer = writer
+        self.alert_sinks: list[AlertSinkBase] = alert_sinks or []
 
         self._buffer: pd.DataFrame = pd.DataFrame()
         self._scored_accumulator: list[pd.DataFrame] = []
@@ -289,6 +292,12 @@ class EdgeRuntime:
                                 "ALERT: %s on %s (score=%.2f)",
                                 alert["fault"], alert["channel_id"], alert["score"],
                             )
+                            for sink in self.alert_sinks:
+                                try:
+                                    sink.publish(alert)
+                                except Exception as exc:
+                                    log.warning("Alert sink %s failed: %s",
+                                                type(sink).__name__, exc)
 
                     # Reset consecutive error counter on success
                     self._consecutive_errors = 0
@@ -352,6 +361,11 @@ class EdgeRuntime:
             self._flush_scored()
             if self.writer and self._alerts:
                 self.writer.write_alerts(self._alerts)
+            for sink in self.alert_sinks:
+                try:
+                    sink.close()
+                except Exception as exc:
+                    log.warning("Alert sink close failed: %s", exc)
             self._write_heartbeat(iteration)
 
         log.info(
