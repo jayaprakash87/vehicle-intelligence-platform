@@ -20,6 +20,7 @@ import pandas as pd
 
 from src.config.models import EdgeConfig
 from src.edge.cycle import CycleAccumulator
+from src.edge.lifetime import LifetimeHealthTracker
 from src.inference.pipeline import InferencePipeline
 from src.storage.writer import StorageWriter
 from src.transport.alert_sinks import AlertSinkBase
@@ -104,6 +105,14 @@ class EdgeRuntime:
                 boundary_column=self.cfg.cycle_boundary_column,
             )
         self.cycle_summaries: list = []  # CycleSummary objects from completed cycles
+
+        # Lifetime health tracking
+        self._lifetime_tracker: LifetimeHealthTracker | None = None
+        if self.cfg.lifetime_tracking_enabled and self.cfg.cycle_tracking_enabled:
+            self._lifetime_tracker = LifetimeHealthTracker(
+                trend_window=self.cfg.lifetime_trend_window,
+                upper_bins=self.cfg.lifetime_upper_bins,
+            )
 
         # Phase D state
         self.stats = RuntimeStats()
@@ -310,6 +319,9 @@ class EdgeRuntime:
                         new_sums = self._cycle_accumulator.ingest(scored)
                         if new_sums:
                             self.cycle_summaries.extend(new_sums)
+                            if self._lifetime_tracker is not None:
+                                for cs in new_sums:
+                                    self._lifetime_tracker.ingest(cs)
 
                     # Emit alerts only for anomalous rows above the configured threshold.
                     iter_alerts = 0
@@ -413,6 +425,8 @@ class EdgeRuntime:
                 s = self._cycle_accumulator.close()
                 if s:
                     self.cycle_summaries.append(s)
+                    if self._lifetime_tracker is not None:
+                        self._lifetime_tracker.ingest(s)
                 self.cycle_summaries.extend(
                     s2 for s2 in self._cycle_accumulator.completed
                     if s2 not in self.cycle_summaries

@@ -120,6 +120,11 @@ class EdgeConfig(BaseModel):
     cycle_type: str = "ignition"  # label: ignition, drive, charge
     cycle_boundary_column: str | None = "state_on_off"  # column for open/close detection
 
+    # Lifetime health tracking (requires cycle_tracking_enabled)
+    lifetime_tracking_enabled: bool = False  # enable lifetime health updates on cycle close
+    lifetime_trend_window: int = 5  # number of recent scores for trend detection
+    lifetime_upper_bins: int = 2  # how many top bins count as "stressed"
+
 
 # ---------------------------------------------------------------------------
 # MQTT config

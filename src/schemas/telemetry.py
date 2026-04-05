@@ -517,3 +517,130 @@ class CycleSummary(BaseModel):
     @field_serializer("open_timestamp", "close_timestamp")
     def _serialize_ts(self, v: datetime, _info) -> str:
         return v.isoformat() if isinstance(v, datetime) else str(v)
+
+
+# ---------------------------------------------------------------------------
+# Lifetime health
+# ---------------------------------------------------------------------------
+
+
+class TrendDirection(str, Enum):
+    """Trend of lifetime health over recent cycles."""
+
+    IMPROVING = "improving"
+    STABLE = "stable"
+    DEGRADING = "degrading"
+    WORSENING = "worsening"
+
+
+class LoadHistogram(BaseModel):
+    """Fixed-bin histogram counter for one load spectrum dimension.
+
+    Each bin counts the number of completed cycles whose value fell
+    into that range.  Edges define the upper bounds of each bin
+    (the last bin captures everything above the second-to-last edge).
+
+    Example for peak current with 8 bins:
+        edges = [2, 5, 8, 12, 15, 20, 30]   (7 edges → 8 bins)
+        counts = [1204, 3891, 2107, 845, 312, 97, 18, 3]
+
+    Memory: 8 × uint32 ≈ 32 bytes per histogram — NvM-friendly.
+    """
+
+    name: str  # e.g. "peak_current_a"
+    unit: str = ""  # e.g. "A", "°C", "ratio"
+    edges: list[float]  # N-1 upper-bound edges → N bins
+    counts: list[int] = Field(default_factory=list)  # one count per bin
+
+    def model_post_init(self, __context) -> None:
+        if not self.counts:
+            self.counts = [0] * (len(self.edges) + 1)
+
+    def bin_index(self, value: float) -> int:
+        """Return the bin index for a given value."""
+        for i, edge in enumerate(self.edges):
+            if value < edge:
+                return i
+        return len(self.edges)
+
+    def record(self, value: float) -> None:
+        """Increment the bin corresponding to *value*."""
+        self.counts[self.bin_index(value)] += 1
+
+    @property
+    def total(self) -> int:
+        return sum(self.counts)
+
+    def upper_fraction(self, top_n_bins: int = 2) -> float:
+        """Fraction of total counts in the top *top_n_bins* bins."""
+        t = self.total
+        if t == 0:
+            return 0.0
+        return sum(self.counts[-top_n_bins:]) / t
+
+
+class LifetimeHealthState(BaseModel):
+    """Histogram-based lifetime state — the automotive-correct approach.
+
+    Core state is 6 load-spectrum histograms (8 bins each ≈ 192 bytes).
+    Health score and trend are **derived** from histogram shape, not
+    stored independently.
+
+    Updated once per completed cycle — not per telemetry sample.
+    """
+
+    # Identity
+    cycles_ingested: int = 0
+
+    # --- Load-spectrum histograms (primary state) ---
+    peak_current_hist: LoadHistogram = Field(
+        default_factory=lambda: LoadHistogram(
+            name="peak_current_a", unit="A",
+            edges=[2.0, 5.0, 8.0, 12.0, 15.0, 20.0, 30.0],
+        )
+    )
+    peak_temperature_hist: LoadHistogram = Field(
+        default_factory=lambda: LoadHistogram(
+            name="peak_temperature_c", unit="°C",
+            edges=[40.0, 60.0, 80.0, 100.0, 120.0, 140.0, 160.0],
+        )
+    )
+    cycle_stress_hist: LoadHistogram = Field(
+        default_factory=lambda: LoadHistogram(
+            name="cycle_stress", unit="ratio",
+            edges=[0.05, 0.10, 0.15, 0.25, 0.40, 0.60, 0.80],
+        )
+    )
+    trips_per_cycle_hist: LoadHistogram = Field(
+        default_factory=lambda: LoadHistogram(
+            name="trips_per_cycle", unit="count",
+            edges=[1.0, 2.0, 3.0, 5.0, 8.0, 12.0, 20.0],
+        )
+    )
+    retries_per_cycle_hist: LoadHistogram = Field(
+        default_factory=lambda: LoadHistogram(
+            name="retries_per_cycle", unit="count",
+            edges=[1.0, 2.0, 3.0, 5.0, 8.0, 12.0, 20.0],
+        )
+    )
+    thermal_dwell_frac_hist: LoadHistogram = Field(
+        default_factory=lambda: LoadHistogram(
+            name="thermal_dwell_fraction", unit="ratio",
+            edges=[0.01, 0.05, 0.10, 0.20, 0.35, 0.50, 0.75],
+        )
+    )
+
+    # --- Derived (recomputed on each ingest, not primary state) ---
+    health_score: float = 1.0  # 1.0 = perfect, 0.0 = critical
+    health_band: HealthBand = HealthBand.NOMINAL
+    trend: TrendDirection = TrendDirection.STABLE
+
+    # Snapshot
+    last_cycle_id: str = ""
+    last_update_timestamp: datetime | None = None
+
+    @field_serializer("last_update_timestamp")
+    def _serialize_ts(self, v: datetime | None, _info) -> str | None:
+        if v is None:
+            return None
+        return v.isoformat() if isinstance(v, datetime) else str(v)
