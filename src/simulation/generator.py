@@ -181,6 +181,43 @@ class TelemetryGenerator:
         return np.clip(temp, -40, 150)
 
     # ------------------------------------------------------------------
+    # ISENSE sensing chain
+    # ------------------------------------------------------------------
+
+    def _apply_isense_chain(
+        self,
+        current: np.ndarray,
+        temp: np.ndarray,
+        ch: ChannelMeta,
+    ) -> np.ndarray:
+        """Apply ISENSE sensing-chain errors to the true load current.
+
+        Models the PROFET+2 / VIPower ILIS output as read by the CDD ADC:
+
+            I_reported = I_load × (1 + δ_r) × (1 + δ_k) × (1 + α_k × (T_j − 25))
+
+        where:
+          δ_r ~ U(±r_ilis_tolerance)  — R_ILIS manufacturing tolerance, frozen
+          δ_k ~ U(±0.15)              — k_ILIS unit-to-unit variation, frozen
+          α_k = k_ilis_tempco_ppm_c × 1e-6  — dynamic temperature coefficient
+
+        Both frozen offsets are sampled once per call (i.e. per channel per
+        simulation run), matching a real unit that ships with fixed but unknown
+        component offsets.  NaN values (dropped-packet samples) propagate
+        unchanged.
+        """
+        # Frozen per-channel manufacturing scatter (one draw per simulation run)
+        delta_r = self.rng.uniform(-ch.r_ilis_tolerance, ch.r_ilis_tolerance)
+        delta_k = self.rng.uniform(-0.15, 0.15)  # ±15 % k_ILIS unit variation
+        k_fixed = (1.0 + delta_r) * (1.0 + delta_k)
+
+        # Dynamic temperature coefficient (vectorised; NaN-safe)
+        alpha_k = ch.k_ilis_tempco_ppm_c * 1e-6  # ppm/°C → 1/°C
+        k_temp = 1.0 + alpha_k * (temp - 25.0)
+
+        return current * k_fixed * k_temp
+
+    # ------------------------------------------------------------------
     # Load transient
     # ------------------------------------------------------------------
 
@@ -507,6 +544,13 @@ class TelemetryGenerator:
                 end_idx = min(start_idx + int(fi.duration_s / interval_s), n)
                 sl = slice(start_idx, end_idx)
                 status[sl] = np.where(temperature[sl] > 80, DeviceStatus.WARNING.value, status[sl])
+
+        # --- ISENSE sensing-chain gain error ---
+        # Apply k_ILIS temperature drift + R_ILIS tolerance to convert true
+        # load current into the value that the CDD ADC actually measures.
+        # Thermal-shutdown zeros (near zero, not NaN) and NaN dropped packets
+        # both propagate correctly through the multiplicative chain.
+        current = self._apply_isense_chain(current, temperature, ch)
 
         # ADC quantization on final current signal
         if ch.current_adc_bits < 16:

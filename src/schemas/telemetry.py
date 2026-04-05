@@ -213,6 +213,29 @@ class EFuseProfile(BaseModel):
         description="Junction temperature for thermal shutdown (°C). Typical: 150–175°C.",
     )
 
+    # --- ISENSE current-sense chain ---
+    # PROFET+2 / VIPower ICs expose an ILIS pin: I_ILIS = I_load / k_ILIS.
+    # The CDD places an external R_ILIS to convert I_ILIS → V_ILIS → ADC.
+    # Two independent error sources determine how far I_reported deviates from I_load:
+    #   1. R_ILIS manufacturing tolerance (±20 % typical for 1 kΩ-class resistors)
+    #   2. k_ILIS temperature coefficient (~-500 ppm/°C) and unit variation (±15 %)
+    k_ilis: float = Field(
+        default=5000.0,
+        description="Current-sense ratio k_ILIS = I_load / I_ILIS (typ. 1 500–8 500 for PROFET+2)",
+    )
+    k_ilis_tempco_ppm_c: float = Field(
+        default=-500.0,
+        description="Temperature coefficient of k_ILIS in ppm/°C (typ. −400 to −600 ppm/°C)",
+    )
+    r_ilis_ohm: float = Field(
+        default=1200.0,
+        description="Nominal ISENSE sense resistor R_ILIS in Ω (board-level, OEM-selected)",
+    )
+    r_ilis_tolerance: float = Field(
+        default=0.20,
+        description="R_ILIS manufacturing tolerance fraction ± (e.g. 0.20 = ±20 %)",
+    )
+
     # --- Safety classification ---
     safety_level: SafetyLevel = Field(
         default=SafetyLevel.QM, description="ISO 26262 classification"
@@ -412,6 +435,24 @@ class ChannelMeta(BaseModel):
     )
     cooldown_s: float = Field(default=1.0, ge=0.0, description="Auto-retry delay after eFuse trip")
     max_retries: int = Field(default=3, ge=0, description="Max auto-retries before latch-off")
+
+    # --- ISENSE current-sense chain ---
+    k_ilis: float = Field(
+        default=5000.0,
+        description="k_ILIS current-sense ratio I_load / I_ILIS",
+    )
+    k_ilis_tempco_ppm_c: float = Field(
+        default=-500.0,
+        description="k_ILIS temperature coefficient ppm/°C",
+    )
+    r_ilis_ohm: float = Field(
+        default=1200.0,
+        description="R_ILIS sense resistor nominal value Ω",
+    )
+    r_ilis_tolerance: float = Field(
+        default=0.20,
+        description="R_ILIS manufacturing tolerance fraction ±",
+    )
 
 
 class FaultInjection(BaseModel):

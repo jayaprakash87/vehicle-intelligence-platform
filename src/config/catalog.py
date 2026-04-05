@@ -62,6 +62,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=5,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=8500.0,  # BTS7040 ILIS ratio (datasheet typ.)
     ),
     # BTS7020-2EPA: 20mΩ, ~5.5A, dual-channel
     EFuseFamily.INF_HS_5A: EFuseProfile(
@@ -78,6 +79,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=5,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=6400.0,  # BTS7020 ILIS ratio
     ),
     # BTS7012-1EPA: 12mΩ, ~9A, single-channel
     EFuseFamily.INF_HS_9A: EFuseProfile(
@@ -94,6 +96,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=4,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=4580.0,  # BTS7012 ILIS ratio
     ),
     # BTS7010-1EPA: 10mΩ, ~11A, single-channel
     EFuseFamily.INF_HS_11A: EFuseProfile(
@@ -110,6 +113,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=4,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=3640.0,  # BTS7010 ILIS ratio
     ),
     # BTS7008-1EPA: 8mΩ, ~14A, single-channel
     EFuseFamily.INF_HS_14A: EFuseProfile(
@@ -126,6 +130,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=3,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=3640.0,  # BTS7008 ILIS ratio
     ),
     # BTS7006-1EPZ: 6mΩ, ~18A, single-channel
     EFuseFamily.INF_HS_18A: EFuseProfile(
@@ -142,6 +147,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=3,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=2830.0,  # BTS7006 ILIS ratio
     ),
     # BTS7004-1EPP: 4mΩ, ~28A, single-channel
     EFuseFamily.INF_HS_28A: EFuseProfile(
@@ -158,6 +164,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=3,
         current_adc_bits=14,
         load_type="resistive",
+        k_ilis=1550.0,  # BTS7004 ILIS ratio (large die → lower ratio)
     ),
     # ── Infineon multi-channel and high-current ──────────────────────────────
     #
@@ -176,6 +183,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=3,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=3640.0,  # TLE92104 ILIS ratio
         safety_level=SafetyLevel.ASIL_B,
     ),
     # BTS81000-SSGI-6ET: high-current PDU, ≤100A
@@ -193,6 +201,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=2,
         current_adc_bits=10,
         load_type="resistive",
+        k_ilis=1000.0,  # BTS81000 high-current sense ratio
         safety_level=SafetyLevel.ASIL_B,
     ),
     # ── ST VIPower single high-side ──────────────────────────────────────────
@@ -212,6 +221,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=4,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=7500.0,  # ST VN7140 CS ratio
     ),
     # VN9E30F: single HS, ~30A
     EFuseFamily.ST_HS_30A: EFuseProfile(
@@ -228,6 +238,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=2,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=4000.0,  # ST VN9E30F CS ratio
     ),
     # VN7050AS: single HS, ~50A
     EFuseFamily.ST_HS_50A: EFuseProfile(
@@ -244,6 +255,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=2,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=2500.0,  # ST VN7050 CS ratio
     ),
     # ── ST VIPower dual, H-bridge, low-side ──────────────────────────────────
     #
@@ -262,6 +274,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=3,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=7500.0,  # ST VND7140 CS ratio
     ),
     # VNH9045AQTR: H-bridge motor driver, ~30A
     EFuseFamily.ST_HB_30A: EFuseProfile(
@@ -278,6 +291,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=3,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=4000.0,  # ST VNH9045 CS ratio
     ),
     # VNL5050S5-E: low-side, ~50A
     EFuseFamily.ST_LS_50A: EFuseProfile(
@@ -294,6 +308,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=2,
         current_adc_bits=10,
         load_type="resistive",
+        k_ilis=2500.0,  # ST VNL5050 CS ratio
     ),
     # ── Custom / ASIC ─────────────────────────────────────────────────────────
     # Safe generic defaults — users MUST override for real custom ASICs.
@@ -311,6 +326,7 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         max_retries=3,
         current_adc_bits=12,
         load_type="resistive",
+        k_ilis=5000.0,  # CUSTOM — override for real ASIC
     ),
 }
 
@@ -399,6 +415,10 @@ def build_channels(
             "short_circuit_threshold_a": profile.short_circuit_threshold_a,
             "thermal_shutdown_c": profile.thermal_shutdown_c,
             "load_type": profile.load_type,
+            "k_ilis": profile.k_ilis,
+            "k_ilis_tempco_ppm_c": profile.k_ilis_tempco_ppm_c,
+            "r_ilis_ohm": profile.r_ilis_ohm,
+            "r_ilis_tolerance": profile.r_ilis_tolerance,
         }
 
         # Inherit from zone controller if assigned
