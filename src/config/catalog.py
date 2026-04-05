@@ -421,6 +421,7 @@ def build_channels(
             "r_ilis_tolerance": profile.r_ilis_tolerance,
             "ol_blank_time_ms": profile.ol_blank_time_ms,
             "ol_threshold_a": profile.ol_threshold_a,
+            "rds_on_tempco_exp": profile.rds_on_tempco_exp,
         }
 
         # Inherit from zone controller if assigned

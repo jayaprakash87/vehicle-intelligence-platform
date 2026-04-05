@@ -252,6 +252,20 @@ class EFuseProfile(BaseModel):
         description="Open-load detection threshold A (0 = auto: 3 % of nominal_current_a)",
     )
 
+    # --- Rds,on temperature coefficient ---
+    # For N-channel power MOSFETs (PROFET+2, VIPower), on-resistance rises with
+    # junction temperature following a power-law:
+    #   R_ds,on(T_j) = R_ds,on(25°C) × (T_j / T_ref)ⁿ
+    # where T_j and T_ref are in Kelvin (T_ref = 300 K ≈ 27°C).
+    # Exponent n ≈ 2.3 for typical PROFET+2 / VIPower Si MOSFETs.
+    # At T_j = 150°C (423 K): factor = (423/300)^2.3 ≈ 2.5×.
+    # This creates a positive thermal feedback loop: more current → more heat
+    # → higher Rds,on → more power dissipated → even more heat.
+    rds_on_tempco_exp: float = Field(
+        default=2.3,
+        description="Rds,on power-law temperature exponent n. R(T) = R(25°C) × (T_K/300)ⁿ",
+    )
+
     # --- Safety classification ---
     safety_level: SafetyLevel = Field(
         default=SafetyLevel.QM, description="ISO 26262 classification"
@@ -478,6 +492,12 @@ class ChannelMeta(BaseModel):
     ol_threshold_a: float = Field(
         default=0.0,
         description="OL detection threshold A (0 = auto: 3 % of nominal_current_a)",
+    )
+
+    # --- Rds,on temperature coefficient ---
+    rds_on_tempco_exp: float = Field(
+        default=2.3,
+        description="Rds,on power-law exponent n: R(T) = R(25°C) × (T_K/300)ⁿ",
     )
 
 

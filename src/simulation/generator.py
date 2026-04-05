@@ -164,15 +164,29 @@ class TelemetryGenerator:
         """First-order RC thermal model: T_j = T_amb + P · R_th · (1 - e^(-t/τ)).
 
         Computed iteratively to handle dynamic power changes from load current.
-        P = I² · R_ds(on)
+
+        Rds,on is temperature-dependent (PROFET+2 / VIPower power-law):
+            R_ds,on(T_j) = R_ds,on(25°C) × (T_j_K / 300)^n
+        where T_j_K is junction temperature in Kelvin and n ≈ 2.3.
+
+        This models the positive thermal feedback loop:
+            more current → more heat → higher Rds,on → more P = I²·R → more heat.
+
+        P = I² · R_ds,on(T_j)
         """
         n = len(current)
         temp = np.empty(n)
-        t_j = ch.t_ambient_c  # initial junction temp = ambient
+        t_j = ch.t_ambient_c  # initial junction temp = ambient (°C)
         alpha = interval_s / ch.tau_thermal_s  # discrete time constant
+        t_ref_k = 300.0  # reference temperature in Kelvin (≈ 27°C)
+        exp = ch.rds_on_tempco_exp
 
         for i in range(n):
-            power_w = current[i] ** 2 * ch.r_ds_on_ohm
+            # Temperature-dependent Rds,on — cap at ambient (IC is off above T_sd)
+            t_j_safe = min(t_j, ch.thermal_shutdown_c) if np.isfinite(t_j) else ch.t_ambient_c
+            t_j_k = max(t_j_safe + 273.15, 1.0)  # guard against non-positive K
+            r_ds_on_t = ch.r_ds_on_ohm * (t_j_k / t_ref_k) ** exp
+            power_w = current[i] ** 2 * r_ds_on_t
             t_steady = ch.t_ambient_c + power_w * ch.r_thermal_kw
             # Exponential approach to steady state
             t_j = t_j + alpha * (t_steady - t_j)

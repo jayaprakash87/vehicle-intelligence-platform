@@ -269,6 +269,7 @@ def test_thermal_shutdown_hysteresis_recovery():
         r_thermal_kw=60.0,
         tau_thermal_s=3.0,  # fast thermal response for quicker decay
         t_ambient_c=25.0,
+        rds_on_tempco_exp=0.0,  # disable tempco: this test exercises hysteresis, not Rds,on(T)
     )
     cfg = _make_config(
         channels=[ch],
