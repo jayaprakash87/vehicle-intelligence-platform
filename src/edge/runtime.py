@@ -19,6 +19,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.config.models import EdgeConfig
+from src.edge.cycle import CycleAccumulator
 from src.inference.pipeline import InferencePipeline
 from src.storage.writer import StorageWriter
 from src.transport.alert_sinks import AlertSinkBase
@@ -94,6 +95,15 @@ class EdgeRuntime:
         self._running = False
         self._flush_counter = 0
         self._flush_part = 0
+
+        # Cycle tracking
+        self._cycle_accumulator: CycleAccumulator | None = None
+        if self.cfg.cycle_tracking_enabled:
+            self._cycle_accumulator = CycleAccumulator(
+                cycle_type=self.cfg.cycle_type,
+                boundary_column=self.cfg.cycle_boundary_column,
+            )
+        self.cycle_summaries: list = []  # CycleSummary objects from completed cycles
 
         # Phase D state
         self.stats = RuntimeStats()
@@ -295,6 +305,12 @@ class EdgeRuntime:
                     if self._flush_counter >= self.cfg.flush_interval:
                         self._flush_scored()
 
+                    # Feed cycle accumulator
+                    if self._cycle_accumulator is not None:
+                        new_sums = self._cycle_accumulator.ingest(scored)
+                        if new_sums:
+                            self.cycle_summaries.extend(new_sums)
+
                     # Emit alerts only for anomalous rows above the configured threshold.
                     iter_alerts = 0
                     anomaly_mask = scored.get(
@@ -392,6 +408,15 @@ class EdgeRuntime:
             # Graceful cleanup regardless of how we exit
             self._restore_signal_handlers()
             self._flush_scored()
+            # Close any open cycle
+            if self._cycle_accumulator is not None:
+                s = self._cycle_accumulator.close()
+                if s:
+                    self.cycle_summaries.append(s)
+                self.cycle_summaries.extend(
+                    s2 for s2 in self._cycle_accumulator.completed
+                    if s2 not in self.cycle_summaries
+                )
             if self.writer and self._alerts:
                 self.writer.write_alerts(self._alerts)
             for sink in self.alert_sinks:

@@ -115,6 +115,11 @@ class EdgeConfig(BaseModel):
     disk_min_free_mb: int = 100  # warn + skip writes below this threshold
     model_hot_reload: bool = True  # watch model file mtime and reload on change
 
+    # Cycle tracking
+    cycle_tracking_enabled: bool = False  # enable cycle accumulation in the edge loop
+    cycle_type: str = "ignition"  # label: ignition, drive, charge
+    cycle_boundary_column: str | None = "state_on_off"  # column for open/close detection
+
 
 # ---------------------------------------------------------------------------
 # MQTT config

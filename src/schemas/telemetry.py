@@ -462,3 +462,58 @@ class InferenceResult(BaseModel):
     fault_confidence: float = 0.0
     likely_causes: list[str] = Field(default_factory=list)
     recommended_action: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Cycle health
+# ---------------------------------------------------------------------------
+
+
+class HealthBand(str, Enum):
+    """Discrete health classification for a completed cycle."""
+
+    NOMINAL = "nominal"
+    MONITOR = "monitor"
+    DEGRADED = "degraded"
+    CRITICAL = "critical"
+
+
+class CycleSummary(BaseModel):
+    """Compact summary of one completed cycle (ignition / drive / charge).
+
+    Produced by the CycleAccumulator at cycle-close.  Designed to be small
+    enough for a PNDS-style ring buffer on the ECU.
+    """
+
+    cycle_id: str
+    cycle_type: str = "ignition"
+    open_timestamp: datetime
+    close_timestamp: datetime
+    duration_s: float = 0.0
+
+    # Counters
+    anomaly_count: int = 0
+    trip_count: int = 0
+    retry_count: int = 0
+    sample_count: int = 0
+
+    # Peaks
+    peak_current_a: float = 0.0
+    peak_temperature_c: float = 0.0
+
+    # Dwell (seconds spent above thresholds)
+    high_load_dwell_s: float = 0.0
+    high_temp_dwell_s: float = 0.0
+    voltage_sag_dwell_s: float = 0.0
+
+    # Dominant fault
+    dominant_fault: FaultType = FaultType.NONE
+    dominant_fault_confidence: float = 0.0
+
+    # Scores
+    cycle_stress: float = 0.0
+    health_band: HealthBand = HealthBand.NOMINAL
+
+    @field_serializer("open_timestamp", "close_timestamp")
+    def _serialize_ts(self, v: datetime, _info) -> str:
+        return v.isoformat() if isinstance(v, datetime) else str(v)
