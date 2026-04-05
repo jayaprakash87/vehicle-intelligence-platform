@@ -44,7 +44,8 @@ def _make_telemetry(n: int, seed: int = 42) -> pd.DataFrame:
 def _runtime(df, tmp_path=None, **edge_kw):
     transport = DataFrameTransport(df)
     pipeline = InferencePipeline()
-    defaults = {"batch_size": 25, "flush_interval": 2}
+    # Disable DTC debounce by default in hardening tests — DTC is tested separately
+    defaults = {"batch_size": 25, "flush_interval": 2, "dtc_enabled": False}
     defaults.update(edge_kw)
     cfg = EdgeConfig(**defaults)
     writer = None

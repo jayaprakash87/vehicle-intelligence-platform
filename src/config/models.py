@@ -125,6 +125,19 @@ class EdgeConfig(BaseModel):
     lifetime_trend_window: int = 5  # number of recent scores for trend detection
     lifetime_upper_bins: int = 2  # how many top bins count as "stressed"
 
+    # DTC debounce / healing (AUTOSAR Dem counter-based)
+    dtc_enabled: bool = True  # apply debounce gate before emitting fault alerts
+    dtc_fail_threshold: int = Field(
+        default=3,
+        ge=1,
+        description="Consecutive failing evals required to confirm a DTC (PENDING → CONFIRMED)",
+    )
+    dtc_heal_threshold: int = Field(
+        default=10,
+        ge=1,
+        description="Consecutive passing evals required to clear a confirmed DTC (HEALING → ABSENT)",
+    )
+
 
 # ---------------------------------------------------------------------------
 # MQTT config

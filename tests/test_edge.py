@@ -45,7 +45,7 @@ def _build_runtime(
     # Pipeline with no pre-trained model — falls back to spike_score proxy
     pipeline = InferencePipeline()
 
-    edge_cfg = EdgeConfig(batch_size=batch_size, flush_interval=flush_interval)
+    edge_cfg = EdgeConfig(batch_size=batch_size, flush_interval=flush_interval, dtc_enabled=False)
     writer = None
     if tmp_path is not None:
         writer = StorageWriter(StorageConfig(output_dir=str(tmp_path)))

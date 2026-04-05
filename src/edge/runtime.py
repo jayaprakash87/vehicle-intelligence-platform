@@ -21,6 +21,7 @@ import pandas as pd
 from src.config.models import EdgeConfig
 from src.edge.cycle import CycleAccumulator
 from src.edge.lifetime import LifetimeHealthTracker
+from src.inference.dtc import DTCDebouncer
 from src.inference.pipeline import InferencePipeline
 from src.storage.writer import StorageWriter
 from src.transport.alert_sinks import AlertSinkBase
@@ -121,6 +122,14 @@ class EdgeRuntime:
         self._model_mtime: float | None = None
         self._original_sigint = None
         self._original_sigterm = None
+
+        # DTC debounce / healing state machine
+        self._dtc: DTCDebouncer | None = None
+        if self.cfg.dtc_enabled:
+            self._dtc = DTCDebouncer(
+                fail_threshold=self.cfg.dtc_fail_threshold,
+                heal_threshold=self.cfg.dtc_heal_threshold,
+            )
 
     # ------------------------------------------------------------------
     # Config validation
@@ -335,8 +344,46 @@ class EdgeRuntime:
                         anomaly_mask.fillna(False).astype(bool)
                         & (score_series.fillna(0.0) >= self.cfg.alert_anomaly_threshold)
                     ]
+
+                    # Update DTC state for every evaluated row (both anomalous and clean)
+                    # so that the healing counter advances correctly on passing rows.
+                    if self._dtc is not None:
+                        from src.schemas.telemetry import FaultType as _FT
+
+                        # Advance fail counters for anomalous rows
+                        for _, row in anomalies.iterrows():
+                            ch = str(row.get("channel_id", ""))
+                            fault_str = row.get("predicted_fault", "none")
+                            try:
+                                ft = _FT(fault_str)
+                            except ValueError:
+                                ft = _FT.NONE
+                            if ft != _FT.NONE:
+                                self._dtc.update(ch, ft, fault_present=True)
+
+                        # Advance heal counters for clean rows (not in anomaly set)
+                        clean = scored.drop(index=anomalies.index, errors="ignore")
+                        for _, row in clean.iterrows():
+                            ch = str(row.get("channel_id", ""))
+                            fault_str = row.get("predicted_fault", "none")
+                            try:
+                                ft = _FT(fault_str)
+                            except ValueError:
+                                ft = _FT.NONE
+                            self._dtc.update(ch, ft, fault_present=False)
+
                     for _, row in anomalies.iterrows():
                         alert = self._make_alert(row)
+                        # DTC gate: only publish CONFIRMED faults
+                        if self._dtc is not None:
+                            from src.schemas.telemetry import FaultType as _FT
+
+                            try:
+                                ft = _FT(alert["fault"])
+                            except ValueError:
+                                ft = _FT.NONE
+                            if not self._dtc.is_confirmed(alert["channel_id"], ft):
+                                continue  # PENDING — suppress, do not emit
                         if self._should_emit_alert(alert["channel_id"], alert["fault"]):
                             self._alerts.append(alert)
                             iter_alerts += 1

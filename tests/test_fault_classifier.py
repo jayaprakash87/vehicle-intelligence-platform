@@ -111,3 +111,95 @@ def test_priority_dropped_packet_over_others():
     row = _row(missing_rate=0.3, spike_score=5.0, trip_flag=True)
     fault, _, _ = clf.classify(row)
     assert fault == FaultType.DROPPED_PACKET
+
+
+# ---------------------------------------------------------------------------
+# DTCDebouncer tests
+# ---------------------------------------------------------------------------
+
+
+from src.inference.dtc import DTCDebouncer, DTCStatus  # noqa: E402
+
+
+def test_dtc_pending_before_confirmed():
+    """Fault must be seen fail_threshold times before becoming CONFIRMED."""
+    dtc = DTCDebouncer(fail_threshold=3, heal_threshold=5)
+    s1 = dtc.update("ch_01", FaultType.OVERLOAD_SPIKE, True)
+    s2 = dtc.update("ch_01", FaultType.OVERLOAD_SPIKE, True)
+    assert s1 == DTCStatus.PENDING
+    assert s2 == DTCStatus.PENDING
+    assert not dtc.is_confirmed("ch_01", FaultType.OVERLOAD_SPIKE)
+    s3 = dtc.update("ch_01", FaultType.OVERLOAD_SPIKE, True)
+    assert s3 == DTCStatus.CONFIRMED
+    assert dtc.is_confirmed("ch_01", FaultType.OVERLOAD_SPIKE)
+
+
+def test_dtc_transient_never_confirms():
+    """A single failing eval followed by a pass should silently reset to ABSENT."""
+    dtc = DTCDebouncer(fail_threshold=3, heal_threshold=5)
+    dtc.update("ch_01", FaultType.VOLTAGE_SAG, True)   # PENDING fail_count=1
+    s = dtc.update("ch_01", FaultType.VOLTAGE_SAG, False)  # pass → ABSENT
+    assert s == DTCStatus.ABSENT
+    assert not dtc.is_confirmed("ch_01", FaultType.VOLTAGE_SAG)
+
+
+def test_dtc_healing_requires_consecutive_passes():
+    """CONFIRMED fault must pass heal_threshold consecutive times before clearing."""
+    dtc = DTCDebouncer(fail_threshold=2, heal_threshold=4)
+    # Confirm fault
+    dtc.update("ch_01", FaultType.THERMAL_DRIFT, True)
+    dtc.update("ch_01", FaultType.THERMAL_DRIFT, True)
+    assert dtc.is_confirmed("ch_01", FaultType.THERMAL_DRIFT)
+    # Partial heal — not yet cleared
+    dtc.update("ch_01", FaultType.THERMAL_DRIFT, False)  # HEALING heal_count=1
+    dtc.update("ch_01", FaultType.THERMAL_DRIFT, False)  # heal_count=2
+    dtc.update("ch_01", FaultType.THERMAL_DRIFT, False)  # heal_count=3
+    assert dtc.status("ch_01", FaultType.THERMAL_DRIFT) == DTCStatus.HEALING
+    # Final pass clears it
+    dtc.update("ch_01", FaultType.THERMAL_DRIFT, False)  # heal_count=4 → ABSENT
+    assert dtc.status("ch_01", FaultType.THERMAL_DRIFT) == DTCStatus.ABSENT
+
+
+def test_dtc_fail_during_healing_reconfirms():
+    """A fail during HEALING should push status back to CONFIRMED."""
+    dtc = DTCDebouncer(fail_threshold=2, heal_threshold=5)
+    dtc.update("ch_01", FaultType.OPEN_LOAD, True)
+    dtc.update("ch_01", FaultType.OPEN_LOAD, True)  # CONFIRMED
+    dtc.update("ch_01", FaultType.OPEN_LOAD, False)  # HEALING
+    dtc.update("ch_01", FaultType.OPEN_LOAD, False)  # HEALING
+    s = dtc.update("ch_01", FaultType.OPEN_LOAD, True)  # fault returned
+    assert s == DTCStatus.CONFIRMED
+
+
+def test_dtc_channels_independent():
+    """DTC state for different channels must not share counters."""
+    dtc = DTCDebouncer(fail_threshold=3, heal_threshold=5)
+    dtc.update("ch_01", FaultType.VOLTAGE_SAG, True)
+    dtc.update("ch_01", FaultType.VOLTAGE_SAG, True)
+    dtc.update("ch_01", FaultType.VOLTAGE_SAG, True)  # ch_01 CONFIRMED
+    assert dtc.is_confirmed("ch_01", FaultType.VOLTAGE_SAG)
+    assert not dtc.is_confirmed("ch_02", FaultType.VOLTAGE_SAG)  # ch_02 untouched
+
+
+def test_dtc_reset_channel():
+    """reset_channel should clear all DTC records for that channel only."""
+    dtc = DTCDebouncer(fail_threshold=2, heal_threshold=5)
+    dtc.update("ch_01", FaultType.OVERLOAD_SPIKE, True)
+    dtc.update("ch_01", FaultType.OVERLOAD_SPIKE, True)  # ch_01 CONFIRMED
+    dtc.update("ch_02", FaultType.VOLTAGE_SAG, True)
+    dtc.update("ch_02", FaultType.VOLTAGE_SAG, True)  # ch_02 CONFIRMED
+    dtc.reset_channel("ch_01")
+    assert dtc.status("ch_01", FaultType.OVERLOAD_SPIKE) == DTCStatus.ABSENT
+    assert dtc.is_confirmed("ch_02", FaultType.VOLTAGE_SAG)  # unaffected
+
+
+def test_dtc_snapshot_excludes_absent():
+    """Snapshot should only include non-ABSENT records."""
+    dtc = DTCDebouncer(fail_threshold=2, heal_threshold=5)
+    dtc.update("ch_01", FaultType.OVERLOAD_SPIKE, True)  # PENDING
+    snap = dtc.snapshot()
+    assert len(snap) == 1
+    key = list(snap.keys())[0]
+    assert snap[key]["status"] == DTCStatus.PENDING.value
+    dtc.update("ch_01", FaultType.OVERLOAD_SPIKE, False)  # healed → ABSENT
+    assert dtc.snapshot() == {}
