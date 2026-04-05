@@ -108,18 +108,19 @@ Keep only compact counters such as:
 - high-temperature dwell
 - voltage-sag dwell
 
-### B. PNDS-Style Ring Buffer
+### B. Cycle Summary List (RAM)
 
-Persistent, fixed-size buffer.
-
-Store completed cycle summaries, not raw telemetry.
+Hold completed cycle summaries in memory until uploaded.
 
 Default rule:
 
 - one compact summary per completed cycle per system or zone
 - channel-level detail only for abnormal channels
+- upload to backend clears the list
 
-This is the core automotive tradeoff.
+Note: real PNDS lives in the Zone Controller AUTOSAR layer (NvM, C/C++).
+VIP runs on a separate Linux compute module and does not write to or emulate PNDS.
+On-vehicle persistence of cycle summaries is the ZC's responsibility, not VIP's.
 
 ### C. Compact Lifetime State
 
@@ -136,19 +137,17 @@ Examples:
 - last health score
 - trend direction
 
-## How PNDS Should Be Used
-
-Treat PNDS as the retention and upload layer for cycle summaries.
+## Cycle Summary Flow
 
 Recommended flow:
 
 1. Streaming logic runs during the open cycle.
 2. The active accumulator collects counters.
 3. At cycle close, VIP computes one compact summary record.
-4. That record is written to the PNDS ring buffer.
-5. Upload occurs when the buffer is full, after a time threshold such as 28 days, or earlier for critical cases.
+4. The summary is held in RAM.
+5. Upload to backend occurs on schedule, buffer-count threshold, or priority override for critical cases.
 
-### Recommended PNDS Record
+### Cycle Summary Record
 
 Keep it small.
 
@@ -223,18 +222,18 @@ For most channels, simple proxies are enough:
 - trip and retry counts
 - decayed burden score
 
-## How PNDS And Load Spectra Fit Together
+## How Cycle Summaries And Load Spectra Fit Together
 
-- PNDS stores cycle summaries
-- spectra represent long-term exposure for selected channels
+- Cycle summaries capture what happened in one session
+- Spectra represent long-term exposure for selected channels
 
 Recommended pattern:
 
 1. During a cycle, update counters and temporary exposure accumulators.
-2. At cycle close, generate one PNDS summary.
+2. At cycle close, generate one cycle summary.
 3. Update compact lifetime state.
 4. Update spectra only for tracked channels.
-5. Let backend/cloud perform richer multi-cycle analysis.
+5. Upload summaries to backend for richer multi-cycle analysis.
 
 ## Health Scoring
 
@@ -321,7 +320,7 @@ Use the 28-day or buffer-full rule, but add priority override:
 ### On Edge
 
 - cycle accumulator in RAM
-- PNDS-like ring buffer with compact system-level cycle summaries
+- in-memory cycle summary list with upload to backend
 - channel detail only for abnormal channels
 - scalar lifetime state for top-risk channels
 
@@ -342,13 +341,13 @@ Use the 28-day or buffer-full rule, but add priority override:
 
 ## Phased Implementation
 
-### Phase 1
+### Phase 1 — Done
 
-- implement cycle tracking
-- implement cycle-close summary generation
-- persist compact PNDS-style records
+- ✅ cycle tracking (CycleAccumulator)
+- ✅ cycle-close summary generation (CycleSummary, HealthBand)
+- ✅ summaries held in RAM, available for upload
 
-### Phase 2
+### Phase 2 — Next
 
 - add compact lifetime state on edge
 - compute health score and trend from cycle summaries

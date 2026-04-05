@@ -1,12 +1,12 @@
 # Developer Reference
 
-Interface contracts, CLI commands, and config scenarios for the implemented streaming layer. For system architecture, see [01_architecture.md](01_architecture.md). For the next engineering work (cycle and lifetime health), see [06_cycle_and_lifetime_health_plan.md](06_cycle_and_lifetime_health_plan.md).
+Interface contracts, CLI commands, and config scenarios for the implemented layers. For system architecture, see [01_architecture.md](01_architecture.md). For the next engineering work (lifetime health), see [06_cycle_and_lifetime_health_plan.md](06_cycle_and_lifetime_health_plan.md).
 
 ---
 
 ## What Is Built
 
-The streaming fault-intelligence pipeline is complete. 248 tests pass.
+Streaming + cycle layers are complete. 267 tests pass.
 
 | Layer | What | Key files |
 |-------|------|-----------|
@@ -15,6 +15,7 @@ The streaming fault-intelligence pipeline is complete. 248 tests pass.
 | Signal Processing | Multi-rate normalizer, 10 rolling features | `src/ingestion/`, `src/features/` |
 | Intelligence | Isolation Forest + rules-based fault classifier (7 types) | `src/models/`, `src/inference/` |
 | Runtime | CAN/XCP/Replay transport, hardened edge loop, storage, CLI | `src/transport/`, `src/edge/`, `src/storage/`, `src/cli.py` |
+| Cycle | CycleAccumulator, CycleSummary, HealthBand, boundary detection | `src/edge/cycle.py`, `src/schemas/telemetry.py` |
 
 ---
 
