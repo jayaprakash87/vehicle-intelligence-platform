@@ -72,6 +72,7 @@ class FaultType(str, Enum):
     JUMP_START = "jump_start"  # External jump-start / booster: bus 16–24 V sustained
     LOAD_DUMP = "load_dump"  # Alternator load dump ISO 16750-2: 40 V spike / ~400 ms
     COLD_CRANK = "cold_crank"  # Cold-crank battery sag: bus 7–9 V / 3–5 s
+    CONNECTOR_AGING = "connector_aging"  # Fretting/oxidation raises harness contact resistance
 
 
 class SourceProtocol(str, Enum):
@@ -502,6 +503,20 @@ class ChannelMeta(BaseModel):
     rds_on_tempco_exp: float = Field(
         default=2.3,
         description="Rds,on power-law exponent n: R(T) = R(25°C) × (T_K/300)ⁿ",
+    )
+
+    # --- Wiring harness + connector resistance ---
+    # Automotive wiring looms: wire ≈ 0.5 mΩ/cm × length; typical harness leg 25–100 mΩ.
+    # Pin/terminal contact resistance: fresh crimp 5–10 mΩ, corroded/fretting 50–500 mΩ.
+    # Both appear as a series resistance between the eFuse output and the load, causing
+    # a measurable voltage drop V_drop = I × (R_harness + R_connector).
+    harness_r_ohm: float = Field(
+        default=0.020,
+        description="Wire harness resistance Ω from eFuse output to load (typ. 20–100 mΩ)",
+    )
+    connector_r_ohm: float = Field(
+        default=0.010,
+        description="Sum of pin/terminal contact resistance Ω on this harness leg (typ. 10–20 mΩ fresh)",
     )
 
 

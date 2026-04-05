@@ -110,5 +110,6 @@ def _recommend_action(fault: FaultType, score: float) -> str:
         FaultType.JUMP_START: "Verify external jump-start voltage; check eFuse OV clamp rating and surge absorber health",
         FaultType.LOAD_DUMP: "Inspect alternator suppression clamp (TVS/varistor); check eFuse over-voltage protection; review ISO 16750-2 compliance",
         FaultType.COLD_CRANK: "Check battery state-of-health and cold-cranking amps (CCA); inspect battery terminals for corrosion",
+        FaultType.CONNECTOR_AGING: "Inspect harness connectors and crimp terminals for fretting wear or oxidation; re-terminate or replace corroded pins",
     }
     return actions.get(fault, "Investigate further")

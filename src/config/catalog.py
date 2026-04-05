@@ -422,6 +422,8 @@ def build_channels(
             "ol_blank_time_ms": profile.ol_blank_time_ms,
             "ol_threshold_a": profile.ol_threshold_a,
             "rds_on_tempco_exp": profile.rds_on_tempco_exp,
+            # harness_r_ohm + connector_r_ohm are board/vehicle-level, not IC-level
+            # — keep ChannelMeta defaults (20 mΩ + 10 mΩ); spec overrides apply below
         }
 
         # Inherit from zone controller if assigned

@@ -280,6 +280,19 @@ class RulesFaultClassifier:
             causes.append("Slow upward trend in load current suggesting wear")
             return FaultType.GRADUAL_DEGRADATION, min(deg_trend / 0.05, 1.0), causes
 
+        # Connector aging — sustained voltage drop with current reduction, no trip
+        voltage_drop = r.get("rolling_voltage_drop", 0.0) or 0.0
+        if voltage_drop > 0.3 and not trip and deg_trend <= 0.01:
+            causes.append(
+                f"Rolling voltage drop {voltage_drop:.2f} V above threshold — "
+                "fretting/oxidation raising connector contact resistance"
+            )
+            if voltage_drop > 1.0:
+                causes.append(
+                    "Voltage drop > 1 V suggests heavily corroded terminal or loose crimp"
+                )
+            return FaultType.CONNECTOR_AGING, min(voltage_drop / 2.0, 1.0), causes
+
         # Noisy sensor — high spike but no trip
         if spike > 2.5 and not trip and not overload:
             causes.append("High variance without protection response — possible sensor noise")

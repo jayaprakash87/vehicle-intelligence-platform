@@ -419,8 +419,8 @@ class TelemetryGenerator:
         # Apply load turn-on transient
         current = self._apply_inrush(current, ch, interval_s)
 
-        # Voltage: derived from shared bus - resistive drop through harness
-        harness_r = 0.020  # 20 mΩ typical harness resistance
+        # Voltage: derived from shared bus - resistive drop through harness + connectors
+        harness_r = ch.harness_r_ohm + ch.connector_r_ohm
         voltage = bus_voltage - current * harness_r + self.rng.normal(0, 0.01, n)
 
         state = np.ones(n, dtype=bool)
@@ -515,11 +515,40 @@ class TelemetryGenerator:
                     voltage[start_idx:end_idx] = np.where(drop_mask, np.nan, voltage[sl])
 
                 case FaultType.GRADUAL_DEGRADATION:
-                    # Slow exponential ramp (aging contact resistance)
+                    # Slow exponential ramp (aging load — insulation breakdown / draw increase)
                     t_norm = np.linspace(0, 1, n_fault)
                     deg = 1.0 + fi.intensity * 0.5 * (np.exp(2 * t_norm) - 1) / (np.e**2 - 1)
                     current[sl] *= deg
                     pwm[sl] = np.clip(100 - np.linspace(0, 30 * fi.intensity, n_fault), 0, 100)
+                    status[sl] = DeviceStatus.WARNING.value
+
+                case FaultType.CONNECTOR_AGING:
+                    # Fretting corrosion / oxidation raises pin contact resistance over time.
+                    # Fresh terminal ≈ 5–10 mΩ; corroded terminal ≈ 50–500 mΩ.
+                    # Model: connector_r grows exponentially — R_c(t) = R_c0 × (1 + k × t_norm²)
+                    # where k = intensity × 20 gives a factor up to 21× at end of window.
+                    # Effect: voltage at load drops; for resistive loads current drops slightly;
+                    # increased I²R dissipation in connector (heat source outside the IC).
+                    t_norm = np.linspace(0, 1, n_fault)
+                    # Exponential-squared aging curve — slow start, accelerating
+                    k_age = fi.intensity * 20.0
+                    r_connector_aged = ch.connector_r_ohm * (1.0 + k_age * t_norm ** 2)
+                    r_total = ch.harness_r_ohm + r_connector_aged  # Ω
+                    # Voltage at load falls with aging R (current stays roughly constant — eFuse
+                    # doesn't adjust; the load sees reduced voltage)
+                    voltage[sl] = bus_voltage[sl] - current[sl] * r_total + self.rng.normal(0, 0.01, n_fault)
+                    # For resistive loads: I = V_load / R_load — voltage drop reduces current slightly
+                    # Model this as a correction proportional to relative voltage reduction
+                    v_nominal_load = bus_voltage[sl] - current[sl] * (ch.harness_r_ohm + ch.connector_r_ohm)
+                    v_aged_load = voltage[sl]
+                    # Avoid division by zero; correction only where v_nominal_load > 0
+                    with np.errstate(invalid="ignore", divide="ignore"):
+                        i_ratio = np.where(
+                            v_nominal_load > 0.5,
+                            np.clip(v_aged_load / v_nominal_load, 0.5, 1.0),
+                            1.0,
+                        )
+                    current[sl] *= i_ratio
                     status[sl] = DeviceStatus.WARNING.value
 
                 case FaultType.OPEN_LOAD:

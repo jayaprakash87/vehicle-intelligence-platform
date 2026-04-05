@@ -123,6 +123,13 @@ class FeatureEngine:
             df["rolling_max_voltage"] = grouped["voltage_v"].transform(
                 lambda s: s.rolling(w, min_periods=mp).max()
             )
+            # Rolling voltage drop vs nominal — rising drop signals connector aging.
+            nominal_v_col = df["nominal_voltage_v"] if "nominal_voltage_v" in df.columns else 13.5
+            df["_vdrop_raw"] = nominal_v_col - df["voltage_v"]
+            df["rolling_voltage_drop"] = grouped["_vdrop_raw"].transform(
+                lambda s: s.rolling(w, min_periods=mp).mean()
+            )
+            df.drop(columns=["_vdrop_raw"], inplace=True)
 
         log.info("Computed features for %d rows", len(df))
         return df
