@@ -72,7 +72,7 @@ def test_inference_result_defaults():
 
 def test_efuse_profile_dual_adc_defaults():
     p = EFuseProfile(
-        efuse_family=EFuseFamily.HS_10A,
+        efuse_family=EFuseFamily.INF_HS_11A,
         nominal_current_a=6.0,
         max_current_a=15.0,
         fuse_rating_a=10.0,
@@ -86,7 +86,7 @@ def test_efuse_profile_dual_adc_defaults():
 
 def test_efuse_profile_custom_adc():
     p = EFuseProfile(
-        efuse_family=EFuseFamily.HS_2A,
+        efuse_family=EFuseFamily.INF_HS_2A,
         nominal_current_a=1.5,
         max_current_a=3.0,
         fuse_rating_a=2.5,
@@ -103,7 +103,7 @@ def test_efuse_profile_custom_adc():
 def test_efuse_profile_fit_threshold_default_zero():
     """fit_threshold_a2s=0 means 'auto-derive'; generator resolves it."""
     p = EFuseProfile(
-        efuse_family=EFuseFamily.HS_15A,
+        efuse_family=EFuseFamily.INF_HS_14A,
         nominal_current_a=10.0,
         max_current_a=20.0,
         fuse_rating_a=15.0,
@@ -117,7 +117,7 @@ def test_efuse_profile_fit_threshold_default_zero():
 
 def test_efuse_profile_explicit_fit_threshold():
     p = EFuseProfile(
-        efuse_family=EFuseFamily.HS_30A,
+        efuse_family=EFuseFamily.ST_HS_30A,
         nominal_current_a=20.0,
         max_current_a=40.0,
         fuse_rating_a=30.0,
@@ -133,7 +133,7 @@ def test_efuse_profile_explicit_fit_threshold():
 
 def test_efuse_profile_safety_level():
     p = EFuseProfile(
-        efuse_family=EFuseFamily.HS_50A,
+        efuse_family=EFuseFamily.ST_HS_50A,
         nominal_current_a=35.0,
         max_current_a=65.0,
         fuse_rating_a=50.0,
@@ -213,7 +213,7 @@ def test_telemetry_record_with_protection_event():
 
 def test_efuse_profile_thermal_shutdown_c_default():
     p = EFuseProfile(
-        efuse_family=EFuseFamily.HS_10A,
+        efuse_family=EFuseFamily.INF_HS_11A,
         nominal_current_a=6.0,
         max_current_a=15.0,
         fuse_rating_a=10.0,
@@ -226,7 +226,7 @@ def test_efuse_profile_thermal_shutdown_c_default():
 
 def test_efuse_profile_thermal_shutdown_c_custom():
     p = EFuseProfile(
-        efuse_family=EFuseFamily.HS_10A,
+        efuse_family=EFuseFamily.INF_HS_11A,
         nominal_current_a=6.0,
         max_current_a=15.0,
         fuse_rating_a=10.0,

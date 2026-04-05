@@ -77,21 +77,42 @@ class SourceProtocol(str, Enum):
 
 
 class EFuseFamily(str, Enum):
-    """eFuse IC families by current class and switch topology.
+    """eFuse IC families aligned to production vehicle programs.
 
-    Names follow industry convention: HS = high-side, LS = low-side.
-    The suffix is the rated continuous current.
+    Covers Infineon PROFET+2 (BTS70xx), TLE multi-channel, BTS high-current,
+    ST VIPower high-side (VN), dual (VND), H-bridge (VNH), low-side (VNL),
+    and a CUSTOM entry for proprietary ASICs.
+
+    Naming: {vendor}_{topology}_{current_class}
+      INF = Infineon, ST = ST Microelectronics
+      HS = high-side, LS = low-side, HB = H-bridge, MULTI = multi-channel
     """
 
-    HS_2A = "hs_2a"  # Interior LEDs, indicators, small sensors
-    HS_5A = "hs_5a"  # Dome lights, mirror fold, rain sensors
-    HS_10A = "hs_10a"  # Headlamps, fog lights, horn
-    HS_15A = "hs_15a"  # Wipers, power windows, heated mirrors
-    HS_20A = "hs_20a"  # Power seats, sunroof
-    HS_30A = "hs_30a"  # Seat heaters, rear defroster, fuel pump
-    HS_50A = "hs_50a"  # HVAC blower, starter relay, engine fan
-    LS_5A = "ls_5a"  # Ground-switch: ambient lighting, footwell LEDs
-    LS_15A = "ls_15a"  # Ground-switch: trunk motor, liftgate
+    # Infineon PROFET+2 — BTS70xx, Rdson-parametric single/dual high-side
+    INF_HS_2A = "inf_hs_2a"  # BTS7040-1EPA — 40mΩ, ~2.8A, LEDs, sensors
+    INF_HS_5A = "inf_hs_5a"  # BTS7020-2EPA — 20mΩ, ~5.5A, dome lights, indicators
+    INF_HS_9A = "inf_hs_9a"  # BTS7012-1EPA — 12mΩ, ~9A, locks, medium loads
+    INF_HS_11A = "inf_hs_11a"  # BTS7010-1EPA — 10mΩ, ~11A, headlamps, fog lights
+    INF_HS_14A = "inf_hs_14a"  # BTS7008-1EPA — 8mΩ, ~14A, wipers, windows
+    INF_HS_18A = "inf_hs_18a"  # BTS7006-1EPZ — 6mΩ, ~18A, seat adjust, defroster
+    INF_HS_28A = "inf_hs_28a"  # BTS7004-1EPP — 4mΩ, ~28A, seat heaters, HVAC
+
+    # Infineon multi-channel and high-current
+    INF_MULTI_10A = "inf_multi_10a"  # TLE92104-232QX — 4ch smart switch, ≤10A/ch
+    INF_HS_100A = "inf_hs_100a"  # BTS81000-SSGI-6ET — high-current PDU, ≤100A
+
+    # ST VIPower single high-side
+    ST_HS_14A = "st_hs_14a"  # VN7140AS — single HS, ~14A
+    ST_HS_30A = "st_hs_30a"  # VN9E30F — single HS, ~30A
+    ST_HS_50A = "st_hs_50a"  # VN7050AS — single HS, ~50A
+
+    # ST VIPower dual high-side, H-bridge, low-side
+    ST_DUAL_14A = "st_dual_14a"  # VND7140AJ — dual HS, ~14A/ch
+    ST_HB_30A = "st_hb_30a"  # VNH9045AQTR — H-bridge motor driver, ~30A
+    ST_LS_50A = "st_ls_50a"  # VNL5050S5-E — low-side, ~50A
+
+    # Custom / ASIC — user-defined eFuse with user-provided parameters
+    CUSTOM = "custom"
 
 
 class SafetyLevel(str, Enum):
@@ -300,7 +321,7 @@ class ChannelMeta(BaseModel):
 
     # eFuse type + physical grouping
     efuse_family: EFuseFamily = Field(
-        default=EFuseFamily.HS_15A, description="eFuse IC family / current class"
+        default=EFuseFamily.INF_HS_14A, description="eFuse IC family from catalog"
     )
     zone_id: str = Field(
         default="", description="Zone Controller this channel belongs to (empty = unassigned)"

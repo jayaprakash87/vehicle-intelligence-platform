@@ -11,6 +11,11 @@ Individual channels can override any parameter.
 Architecture reference:
     eFuse IC (HW) → SPI → CDD (Complex Device Driver, SW) → COM → CAN/LIN
     Zone Controller = physical ECU running the CDD software
+
+Supported IC families:
+    Infineon PROFET+2 (BTS70xx), TLE92104, BTS81000
+    ST VIPower VN (single HS), VND (dual HS), VNH (H-bridge), VNL (low-side)
+    CUSTOM — user-defined ASIC with user-provided parameters
 """
 
 from __future__ import annotations
@@ -26,29 +31,31 @@ from src.schemas.telemetry import (
 # ---------------------------------------------------------------------------
 # Catalog of eFuse IC families with realistic electrical parameters
 # ---------------------------------------------------------------------------
-# Each entry maps an EFuseFamily (current class + topology) to a specific
-# representative IC.  Real vehicle programs select ICs per output; our
-# catalog picks one credible default per class.
+# Each entry maps an EFuseFamily to a specific production IC.
 #
-# Sources: Infineon PROFET+ / PROFET+2 datasheets, STMicroelectronics
-# VIPower (VNx, VNDx) datasheets, typical OEM integration specs.
+# Sources: Infineon PROFET+2 datasheets (BTS70xx), Infineon TLE92104 / BTS81000,
+# STMicroelectronics VIPower datasheets (VN, VND, VNH, VNL).
 #
 # Key relationships:
 #   - r_ds_on falls with higher current ratings (bigger die / parallel FETs)
 #   - r_thermal_kw in °C/W (junction-to-ambient, with PCB copper)
 #   - tau_thermal_s = R_th × C_th time constant
 #   - Multi-channel ICs (e.g. TLE92104 4ch) share thermal mass on the die
+#
+# CUSTOM entry provides safe defaults — users MUST override for real ASICs.
 
 EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
-    # --- BTS7006-1EPP: Infineon PROFET+2, 1ch high-side, ~2.5A class -------
-    EFuseFamily.HS_2A: EFuseProfile(
-        efuse_family=EFuseFamily.HS_2A,
-        ic_part_number="BTS7006-1EPP",
+    # ── Infineon PROFET+2 — BTS70xx, Rdson-parametric ────────────────────────
+    #
+    # BTS7040-1EPA: 40mΩ, ~2.8A, single-channel
+    EFuseFamily.INF_HS_2A: EFuseProfile(
+        efuse_family=EFuseFamily.INF_HS_2A,
+        ic_part_number="BTS7040-1EPA",
         manufacturer="Infineon",
         nominal_current_a=1.5,
-        max_current_a=3.0,
-        fuse_rating_a=2.5,
-        r_ds_on_ohm=0.180,
+        max_current_a=4.0,
+        fuse_rating_a=2.8,
+        r_ds_on_ohm=0.040,
         r_thermal_kw=80.0,
         tau_thermal_s=8.0,
         cooldown_s=0.5,
@@ -56,26 +63,108 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         current_adc_bits=12,
         load_type="resistive",
     ),
-    # --- VN7140AS: STMicro VIPower, 1ch high-side, ~5A class ----------------
-    EFuseFamily.HS_5A: EFuseProfile(
-        efuse_family=EFuseFamily.HS_5A,
-        ic_part_number="VN7140AS",
-        manufacturer="STMicroelectronics",
+    # BTS7020-2EPA: 20mΩ, ~5.5A, dual-channel
+    EFuseFamily.INF_HS_5A: EFuseProfile(
+        efuse_family=EFuseFamily.INF_HS_5A,
+        ic_part_number="BTS7020-2EPA",
+        manufacturer="Infineon",
         nominal_current_a=3.5,
-        max_current_a=7.0,
-        fuse_rating_a=5.0,
-        r_ds_on_ohm=0.060,
-        r_thermal_kw=55.0,
-        tau_thermal_s=12.0,
+        max_current_a=8.0,
+        fuse_rating_a=5.5,
+        r_ds_on_ohm=0.020,
+        r_thermal_kw=65.0,
+        tau_thermal_s=10.0,
         cooldown_s=0.5,
+        max_retries=5,
+        current_adc_bits=12,
+        load_type="resistive",
+    ),
+    # BTS7012-1EPA: 12mΩ, ~9A, single-channel
+    EFuseFamily.INF_HS_9A: EFuseProfile(
+        efuse_family=EFuseFamily.INF_HS_9A,
+        ic_part_number="BTS7012-1EPA",
+        manufacturer="Infineon",
+        nominal_current_a=6.0,
+        max_current_a=12.0,
+        fuse_rating_a=9.0,
+        r_ds_on_ohm=0.012,
+        r_thermal_kw=50.0,
+        tau_thermal_s=12.0,
+        cooldown_s=0.8,
         max_retries=4,
         current_adc_bits=12,
         load_type="resistive",
     ),
-    # --- TLE92104: Infineon, 4ch low-side/high-side smart switch, ~10A class -
-    EFuseFamily.HS_10A: EFuseProfile(
-        efuse_family=EFuseFamily.HS_10A,
-        ic_part_number="TLE92104",
+    # BTS7010-1EPA: 10mΩ, ~11A, single-channel
+    EFuseFamily.INF_HS_11A: EFuseProfile(
+        efuse_family=EFuseFamily.INF_HS_11A,
+        ic_part_number="BTS7010-1EPA",
+        manufacturer="Infineon",
+        nominal_current_a=7.0,
+        max_current_a=15.0,
+        fuse_rating_a=11.0,
+        r_ds_on_ohm=0.010,
+        r_thermal_kw=45.0,
+        tau_thermal_s=14.0,
+        cooldown_s=1.0,
+        max_retries=4,
+        current_adc_bits=12,
+        load_type="resistive",
+    ),
+    # BTS7008-1EPA: 8mΩ, ~14A, single-channel
+    EFuseFamily.INF_HS_14A: EFuseProfile(
+        efuse_family=EFuseFamily.INF_HS_14A,
+        ic_part_number="BTS7008-1EPA",
+        manufacturer="Infineon",
+        nominal_current_a=9.0,
+        max_current_a=18.0,
+        fuse_rating_a=14.0,
+        r_ds_on_ohm=0.008,
+        r_thermal_kw=40.0,
+        tau_thermal_s=15.0,
+        cooldown_s=1.0,
+        max_retries=3,
+        current_adc_bits=12,
+        load_type="resistive",
+    ),
+    # BTS7006-1EPZ: 6mΩ, ~18A, single-channel
+    EFuseFamily.INF_HS_18A: EFuseProfile(
+        efuse_family=EFuseFamily.INF_HS_18A,
+        ic_part_number="BTS7006-1EPZ",
+        manufacturer="Infineon",
+        nominal_current_a=12.0,
+        max_current_a=24.0,
+        fuse_rating_a=18.0,
+        r_ds_on_ohm=0.006,
+        r_thermal_kw=35.0,
+        tau_thermal_s=18.0,
+        cooldown_s=1.0,
+        max_retries=3,
+        current_adc_bits=12,
+        load_type="resistive",
+    ),
+    # BTS7004-1EPP: 4mΩ, ~28A, single-channel
+    EFuseFamily.INF_HS_28A: EFuseProfile(
+        efuse_family=EFuseFamily.INF_HS_28A,
+        ic_part_number="BTS7004-1EPP",
+        manufacturer="Infineon",
+        nominal_current_a=18.0,
+        max_current_a=35.0,
+        fuse_rating_a=28.0,
+        r_ds_on_ohm=0.004,
+        r_thermal_kw=28.0,
+        tau_thermal_s=20.0,
+        cooldown_s=1.5,
+        max_retries=3,
+        current_adc_bits=14,
+        load_type="resistive",
+    ),
+    # ── Infineon multi-channel and high-current ──────────────────────────────
+    #
+    # TLE92104-232QX: 4ch smart switch, ≤10A/ch (only HS used per R30 spec)
+    EFuseFamily.INF_MULTI_10A: EFuseProfile(
+        efuse_family=EFuseFamily.INF_MULTI_10A,
+        ic_part_number="TLE92104-232QX",
         manufacturer="Infineon",
         nominal_current_a=6.0,
         max_current_a=15.0,
@@ -89,42 +178,45 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         load_type="resistive",
         safety_level=SafetyLevel.ASIL_B,
     ),
-    # --- VND7140AJ: STMicro, dual high-side driver, ~15A class ---------------
-    EFuseFamily.HS_15A: EFuseProfile(
-        efuse_family=EFuseFamily.HS_15A,
-        ic_part_number="VND7140AJ",
+    # BTS81000-SSGI-6ET: high-current PDU, ≤100A
+    EFuseFamily.INF_HS_100A: EFuseProfile(
+        efuse_family=EFuseFamily.INF_HS_100A,
+        ic_part_number="BTS81000-SSGI-6ET",
+        manufacturer="Infineon",
+        nominal_current_a=60.0,
+        max_current_a=120.0,
+        fuse_rating_a=100.0,
+        r_ds_on_ohm=0.001,
+        r_thermal_kw=15.0,
+        tau_thermal_s=35.0,
+        cooldown_s=3.0,
+        max_retries=2,
+        current_adc_bits=10,
+        load_type="resistive",
+        safety_level=SafetyLevel.ASIL_B,
+    ),
+    # ── ST VIPower single high-side ──────────────────────────────────────────
+    #
+    # VN7140AS: single HS, ~14A
+    EFuseFamily.ST_HS_14A: EFuseProfile(
+        efuse_family=EFuseFamily.ST_HS_14A,
+        ic_part_number="VN7140AS",
         manufacturer="STMicroelectronics",
-        nominal_current_a=10.0,
-        max_current_a=20.0,
-        fuse_rating_a=15.0,
-        r_ds_on_ohm=0.012,
-        r_thermal_kw=35.0,
-        tau_thermal_s=18.0,
+        nominal_current_a=9.0,
+        max_current_a=18.0,
+        fuse_rating_a=14.0,
+        r_ds_on_ohm=0.040,
+        r_thermal_kw=42.0,
+        tau_thermal_s=14.0,
         cooldown_s=1.0,
-        max_retries=3,
+        max_retries=4,
         current_adc_bits=12,
         load_type="resistive",
     ),
-    # --- BTS7004-1EPP: Infineon PROFET+2, 1ch high-side, ~20A class ----------
-    EFuseFamily.HS_20A: EFuseProfile(
-        efuse_family=EFuseFamily.HS_20A,
-        ic_part_number="BTS7004-1EPP",
-        manufacturer="Infineon",
-        nominal_current_a=14.0,
-        max_current_a=28.0,
-        fuse_rating_a=20.0,
-        r_ds_on_ohm=0.008,
-        r_thermal_kw=30.0,
-        tau_thermal_s=20.0,
-        cooldown_s=1.5,
-        max_retries=3,
-        current_adc_bits=14,
-        load_type="resistive",
-    ),
-    # --- VN9×E30F: STMicro VIPower, 1ch high-side, ~30A class ----------------
-    EFuseFamily.HS_30A: EFuseProfile(
-        efuse_family=EFuseFamily.HS_30A,
-        ic_part_number="VN9xE30F",
+    # VN9E30F: single HS, ~30A
+    EFuseFamily.ST_HS_30A: EFuseProfile(
+        efuse_family=EFuseFamily.ST_HS_30A,
+        ic_part_number="VN9E30F",
         manufacturer="STMicroelectronics",
         nominal_current_a=20.0,
         max_current_a=40.0,
@@ -137,50 +229,84 @@ EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile] = {
         current_adc_bits=12,
         load_type="resistive",
     ),
-    # --- BTS81000-SSGI: Infineon, 1ch high-side, ~50A class ------------------
-    EFuseFamily.HS_50A: EFuseProfile(
-        efuse_family=EFuseFamily.HS_50A,
-        ic_part_number="BTS81000-SSGI",
-        manufacturer="Infineon",
+    # VN7050AS: single HS, ~50A
+    EFuseFamily.ST_HS_50A: EFuseProfile(
+        efuse_family=EFuseFamily.ST_HS_50A,
+        ic_part_number="VN7050AS",
+        manufacturer="STMicroelectronics",
         nominal_current_a=35.0,
         max_current_a=65.0,
         fuse_rating_a=50.0,
         r_ds_on_ohm=0.003,
         r_thermal_kw=18.0,
-        tau_thermal_s=30.0,
-        cooldown_s=3.0,
+        tau_thermal_s=28.0,
+        cooldown_s=2.5,
         max_retries=2,
-        current_adc_bits=10,
-        load_type="resistive",
-        safety_level=SafetyLevel.ASIL_B,
-    ),
-    # --- TLE92104 (LS config): Infineon, 4ch low-side, ~5A class -------------
-    EFuseFamily.LS_5A: EFuseProfile(
-        efuse_family=EFuseFamily.LS_5A,
-        ic_part_number="TLE92104",
-        manufacturer="Infineon",
-        nominal_current_a=3.0,
-        max_current_a=7.0,
-        fuse_rating_a=5.0,
-        r_ds_on_ohm=0.070,
-        r_thermal_kw=60.0,
-        tau_thermal_s=10.0,
-        cooldown_s=0.5,
-        max_retries=4,
         current_adc_bits=12,
         load_type="resistive",
     ),
-    # --- VNH9045: STMicro, H-bridge motor driver, ~15A class ------------------
-    EFuseFamily.LS_15A: EFuseProfile(
-        efuse_family=EFuseFamily.LS_15A,
-        ic_part_number="VNH9045",
+    # ── ST VIPower dual, H-bridge, low-side ──────────────────────────────────
+    #
+    # VND7140AJ: dual HS, ~14A/ch
+    EFuseFamily.ST_DUAL_14A: EFuseProfile(
+        efuse_family=EFuseFamily.ST_DUAL_14A,
+        ic_part_number="VND7140AJ",
         manufacturer="STMicroelectronics",
-        nominal_current_a=10.0,
-        max_current_a=20.0,
-        fuse_rating_a=15.0,
+        nominal_current_a=9.0,
+        max_current_a=18.0,
+        fuse_rating_a=14.0,
+        r_ds_on_ohm=0.060,
+        r_thermal_kw=38.0,
+        tau_thermal_s=16.0,
+        cooldown_s=1.0,
+        max_retries=3,
+        current_adc_bits=12,
+        load_type="resistive",
+    ),
+    # VNH9045AQTR: H-bridge motor driver, ~30A
+    EFuseFamily.ST_HB_30A: EFuseProfile(
+        efuse_family=EFuseFamily.ST_HB_30A,
+        ic_part_number="VNH9045AQTR",
+        manufacturer="STMicroelectronics",
+        nominal_current_a=20.0,
+        max_current_a=40.0,
+        fuse_rating_a=30.0,
         r_ds_on_ohm=0.015,
-        r_thermal_kw=35.0,
-        tau_thermal_s=15.0,
+        r_thermal_kw=30.0,
+        tau_thermal_s=18.0,
+        cooldown_s=1.5,
+        max_retries=3,
+        current_adc_bits=12,
+        load_type="resistive",
+    ),
+    # VNL5050S5-E: low-side, ~50A
+    EFuseFamily.ST_LS_50A: EFuseProfile(
+        efuse_family=EFuseFamily.ST_LS_50A,
+        ic_part_number="VNL5050S5-E",
+        manufacturer="STMicroelectronics",
+        nominal_current_a=35.0,
+        max_current_a=65.0,
+        fuse_rating_a=50.0,
+        r_ds_on_ohm=0.004,
+        r_thermal_kw=20.0,
+        tau_thermal_s=25.0,
+        cooldown_s=2.0,
+        max_retries=2,
+        current_adc_bits=10,
+        load_type="resistive",
+    ),
+    # ── Custom / ASIC ─────────────────────────────────────────────────────────
+    # Safe generic defaults — users MUST override for real custom ASICs.
+    EFuseFamily.CUSTOM: EFuseProfile(
+        efuse_family=EFuseFamily.CUSTOM,
+        ic_part_number="CUSTOM_ASIC",
+        manufacturer="custom",
+        nominal_current_a=5.0,
+        max_current_a=10.0,
+        fuse_rating_a=8.0,
+        r_ds_on_ohm=0.025,
+        r_thermal_kw=50.0,
+        tau_thermal_s=12.0,
         cooldown_s=1.0,
         max_retries=3,
         current_adc_bits=12,
@@ -289,25 +415,31 @@ def build_channels(
 
 
 # ---------------------------------------------------------------------------
-# Realistic vehicle topology templates
+# Example vehicle topology — canonical 65-channel reference
 # ---------------------------------------------------------------------------
 
 
-def sedan_topology() -> tuple[list[ZoneController], list[dict]]:
-    """Return a representative mid-size sedan topology with 52 eFuse channels.
+def example_topology() -> tuple[list[ZoneController], list[dict]]:
+    """Return a generic zonal EE topology with ~65 eFuse channels.
+
+    Demonstrates a modern 4-zone controller architecture typical of BEV /
+    premium platforms.  Zone names and load assignments are intentionally
+    generic so the topology serves as a starting template — users should
+    adapt zone composition, channel counts, and system clusters to match
+    their own vehicle program.
 
     Zones:
-        body (16 ch)  — interior lights, mirrors, locks, windows
-        front (14 ch) — headlamps, wipers, horn, washer, ADAS sensors
-        rear (10 ch)  — tail lights, defroster, trunk, parking sensors
-        underhood (12 ch) — engine fan, fuel pump, starter relay, HVAC
+        zone_rear     (25 ch) — seating, lighting, infotainment, ADAS, drivetrain
+        zone_body     (15 ch) — doors, locks, cabin climate, body electronics
+        zone_front    (15 ch) — power supply, HVAC, suspension, auxiliary loads
+        zone_central  (10 ch) — power distribution, closures, reserves
     """
     zones = [
+        ZoneController(zone_id="zone_rear", name="Rear Zone Controller", location="rear"),
         ZoneController(zone_id="zone_body", name="Body Zone Controller", location="body"),
         ZoneController(zone_id="zone_front", name="Front Zone Controller", location="front"),
-        ZoneController(zone_id="zone_rear", name="Rear Zone Controller", location="rear"),
         ZoneController(
-            zone_id="zone_underhood", name="Underhood Zone Controller", location="underhood"
+            zone_id="zone_central", name="Central Zone Controller", location="underhood"
         ),
     ]
 
@@ -345,500 +477,213 @@ def sedan_topology() -> tuple[list[ZoneController], list[dict]]:
         s.update(kw)
         specs.append(s)
 
-    # ── Body zone (16 channels) ──────────────────────────────────
-    _add(
-        "zone_body",
-        "hs_2a",
-        "dome_light",
-        connected_loads=["dome_light", "map_light_left", "map_light_right"],
-        system_cluster="interior_lighting",
-        system_name="cabin_lights",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_body",
-        "hs_2a",
-        "ambient_led_driver",
-        connected_loads=["ambient_footwell", "ambient_door"],
-        system_cluster="interior_lighting",
-        system_name="ambient_lights",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_body",
-        "hs_2a",
-        "courtesy_light_left",
-        system_cluster="interior_lighting",
-        system_name="entry_lights",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_body",
-        "hs_2a",
-        "courtesy_light_right",
-        system_cluster="interior_lighting",
-        system_name="entry_lights",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_body",
-        "hs_5a",
-        "mirror_fold_left",
-        load_type="motor",
-        inrush_factor=3.0,
-        inrush_duration_ms=30.0,
-        system_cluster="body_comfort",
-        system_name="mirrors",
-        driver_type="h_bridge",
-    )
-    _add(
-        "zone_body",
-        "hs_5a",
-        "mirror_fold_right",
-        load_type="motor",
-        inrush_factor=3.0,
-        inrush_duration_ms=30.0,
-        system_cluster="body_comfort",
-        system_name="mirrors",
-        driver_type="h_bridge",
-    )
-    _add(
-        "zone_body",
-        "hs_5a",
-        "mirror_heater_left",
-        load_type="ptc",
-        system_cluster="body_comfort",
-        system_name="mirrors",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_body",
-        "hs_5a",
-        "mirror_heater_right",
-        load_type="ptc",
-        system_cluster="body_comfort",
-        system_name="mirrors",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_body",
-        "hs_10a",
-        "door_lock_left",
-        load_type="motor",
-        inrush_factor=4.0,
-        inrush_duration_ms=40.0,
-        system_cluster="body_comfort",
-        system_name="central_locking",
-        driver_type="h_bridge",
-    )
-    _add(
-        "zone_body",
-        "hs_10a",
-        "door_lock_right",
-        load_type="motor",
-        inrush_factor=4.0,
-        inrush_duration_ms=40.0,
-        system_cluster="body_comfort",
-        system_name="central_locking",
-        driver_type="h_bridge",
-    )
-    _add(
-        "zone_body",
-        "hs_15a",
-        "window_left_front",
-        load_type="motor",
-        inrush_factor=5.0,
-        inrush_duration_ms=50.0,
-        system_cluster="body_comfort",
-        system_name="power_windows",
-        driver_type="h_bridge",
-    )
-    _add(
-        "zone_body",
-        "hs_15a",
-        "window_right_front",
-        load_type="motor",
-        inrush_factor=5.0,
-        inrush_duration_ms=50.0,
-        system_cluster="body_comfort",
-        system_name="power_windows",
-        driver_type="h_bridge",
-    )
-    _add(
-        "zone_body",
-        "hs_15a",
-        "window_left_rear",
-        load_type="motor",
-        inrush_factor=5.0,
-        inrush_duration_ms=50.0,
-        system_cluster="body_comfort",
-        system_name="power_windows",
-        driver_type="h_bridge",
-    )
-    _add(
-        "zone_body",
-        "hs_15a",
-        "window_right_rear",
-        load_type="motor",
-        inrush_factor=5.0,
-        inrush_duration_ms=50.0,
-        system_cluster="body_comfort",
-        system_name="power_windows",
-        driver_type="h_bridge",
-    )
-    _add(
-        "zone_body",
-        "hs_30a",
-        "seat_heater_left",
-        load_type="ptc",
-        connected_loads=["seat_heater_left", "lumbar_support_left"],
-        system_cluster="body_comfort",
-        system_name="seating",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_body",
-        "hs_30a",
-        "seat_heater_right",
-        load_type="ptc",
-        connected_loads=["seat_heater_right", "lumbar_support_right"],
-        system_cluster="body_comfort",
-        system_name="seating",
-        pwm_capable=True,
-    )
+    # ── Rear zone (25 channels) ──────────────────────────────────
+    # Seating comfort
+    _add("zone_rear", "inf_hs_11a", "seat_adjust_rear",
+         system_cluster="body_comfort", system_name="seat_adjustment")
+    _add("zone_rear", "inf_hs_9a", "seat_heater_rear_right",
+         load_type="ptc", pwm_capable=True,
+         system_cluster="body_comfort", system_name="seat_heating")
+    _add("zone_rear", "inf_hs_9a", "seat_heater_rear_left",
+         load_type="ptc", pwm_capable=True,
+         system_cluster="body_comfort", system_name="seat_heating")
+    _add("zone_rear", "inf_hs_5a", "seat_ventilation_pump",
+         load_type="motor", inrush_factor=3.0, inrush_duration_ms=40.0,
+         system_cluster="body_comfort", system_name="seat_ventilation")
+    _add("zone_rear", "inf_hs_5a", "seatbelt_heater_rear",
+         load_type="ptc", pwm_capable=True,
+         system_cluster="body_comfort", system_name="heated_surfaces")
+    # Infotainment
+    _add("zone_rear", "inf_hs_2a", "wireless_charger_rear_1",
+         load_type="capacitive",
+         system_cluster="infotainment", system_name="connectivity")
+    _add("zone_rear", "inf_hs_2a", "wireless_charger_rear_2",
+         load_type="capacitive",
+         system_cluster="infotainment", system_name="connectivity")
+    _add("zone_rear", "inf_hs_5a", "media_hub_rear",
+         load_type="capacitive",
+         system_cluster="infotainment", system_name="media_interface")
+    # Exterior lighting
+    _add("zone_rear", "inf_hs_9a", "tail_light_left",
+         connected_loads=["tail_light_left", "brake_light_left"],
+         system_cluster="exterior_lighting", system_name="rear_lighting",
+         pwm_capable=True, power_class="always_on")
+    _add("zone_rear", "inf_hs_9a", "tail_light_right",
+         connected_loads=["tail_light_right", "brake_light_right"],
+         system_cluster="exterior_lighting", system_name="rear_lighting",
+         pwm_capable=True, power_class="always_on")
+    _add("zone_rear", "inf_hs_5a", "center_stop_lamp",
+         system_cluster="exterior_lighting", system_name="rear_lighting",
+         pwm_capable=True)
+    _add("zone_rear", "inf_hs_11a", "rear_defroster",
+         load_type="ptc", pwm_capable=True,
+         system_cluster="body_comfort", system_name="climate_support")
+    # Audio
+    _add("zone_rear", "inf_hs_14a", "amplifier_main",
+         system_cluster="infotainment", system_name="audio_system")
+    _add("zone_rear", "inf_hs_14a", "amplifier_subwoofer",
+         system_cluster="infotainment", system_name="audio_system")
+    # Energy / charging
+    _add("zone_rear", "inf_hs_18a", "charge_port_controller",
+         system_cluster="energy_management", system_name="charging")
+    _add("zone_rear", "inf_hs_5a", "power_outlet_rear",
+         system_cluster="energy_management", system_name="auxiliary_power")
+    _add("zone_rear", "inf_hs_5a", "socket_12v_rear",
+         system_cluster="energy_management", system_name="auxiliary_power")
+    # Drivetrain / chassis
+    _add("zone_rear", "inf_hs_28a", "rear_drive_inverter",
+         system_cluster="drivetrain", system_name="electric_drive")
+    _add("zone_rear", "st_hb_30a", "deployable_step",
+         load_type="motor", inrush_factor=5.0, inrush_duration_ms=80.0,
+         system_cluster="body_comfort", system_name="convenience_actuators",
+         driver_type="h_bridge")
+    _add("zone_rear", "inf_hs_14a", "rear_steer_actuator",
+         system_cluster="drivetrain", system_name="rear_axle_steering")
+    # ADAS
+    _add("zone_rear", "inf_hs_2a", "corner_radar_rear_left",
+         load_type="capacitive",
+         system_cluster="adas", system_name="surround_sensing")
+    _add("zone_rear", "inf_hs_2a", "corner_radar_rear_right",
+         load_type="capacitive",
+         system_cluster="adas", system_name="surround_sensing")
+    # Occupant safety
+    _add("zone_rear", "inf_hs_5a", "belt_pretensioner_left",
+         system_cluster="occupant_safety", system_name="restraint_systems")
+    _add("zone_rear", "inf_hs_5a", "belt_pretensioner_right",
+         system_cluster="occupant_safety", system_name="restraint_systems")
+    # Suspension
+    _add("zone_rear", "inf_hs_18a", "active_damper_rear",
+         system_cluster="drivetrain", system_name="active_suspension")
 
-    # ── Front zone (14 channels) ─────────────────────────────────
-    _add(
-        "zone_front",
-        "hs_10a",
-        "headlamp_low_left",
-        system_cluster="exterior_lighting",
-        system_name="front_lighting",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_front",
-        "hs_10a",
-        "headlamp_low_right",
-        system_cluster="exterior_lighting",
-        system_name="front_lighting",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_front",
-        "hs_10a",
-        "headlamp_high_left",
-        system_cluster="exterior_lighting",
-        system_name="front_lighting",
-    )
-    _add(
-        "zone_front",
-        "hs_10a",
-        "headlamp_high_right",
-        system_cluster="exterior_lighting",
-        system_name="front_lighting",
-    )
-    _add(
-        "zone_front",
-        "hs_5a",
-        "drl_left",
-        connected_loads=["drl_left", "turn_signal_left"],
-        system_cluster="exterior_lighting",
-        system_name="front_lighting",
-        pwm_capable=True,
-        power_class="always_on",
-    )
-    _add(
-        "zone_front",
-        "hs_5a",
-        "drl_right",
-        connected_loads=["drl_right", "turn_signal_right"],
-        system_cluster="exterior_lighting",
-        system_name="front_lighting",
-        pwm_capable=True,
-        power_class="always_on",
-    )
-    _add(
-        "zone_front",
-        "hs_5a",
-        "fog_light_left",
-        system_cluster="exterior_lighting",
-        system_name="front_lighting",
-    )
-    _add(
-        "zone_front",
-        "hs_5a",
-        "fog_light_right",
-        system_cluster="exterior_lighting",
-        system_name="front_lighting",
-    )
-    _add(
-        "zone_front",
-        "hs_15a",
-        "wiper_front",
-        load_type="motor",
-        inrush_factor=5.0,
-        inrush_duration_ms=60.0,
-        system_cluster="driver_assist",
-        system_name="wipers",
-    )
-    _add(
-        "zone_front",
-        "hs_5a",
-        "washer_pump",
-        load_type="motor",
-        inrush_factor=3.0,
-        inrush_duration_ms=30.0,
-        system_cluster="driver_assist",
-        system_name="wipers",
-    )
-    _add(
-        "zone_front",
-        "hs_10a",
-        "horn",
-        load_type="inductive",
-        system_cluster="driver_assist",
-        system_name="signalling",
-        power_class="always_on",
-    )
-    _add(
-        "zone_front",
-        "hs_2a",
-        "rain_sensor",
-        system_cluster="driver_assist",
-        system_name="sensors",
-        load_type="capacitive",
-    )
-    _add(
-        "zone_front",
-        "hs_5a",
-        "adas_camera_power",
-        connected_loads=["front_camera", "radar_sensor"],
-        system_cluster="adas",
-        system_name="perception",
-        load_type="capacitive",
-    )
-    _add(
-        "zone_front",
-        "hs_2a",
-        "adas_lidar_power",
-        system_cluster="adas",
-        system_name="perception",
-        load_type="capacitive",
-    )
+    # ── Body zone (15 channels) ──────────────────────────────────
+    # Door modules
+    _add("zone_body", "inf_hs_11a", "door_lock_front_left",
+         load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0,
+         system_cluster="body_comfort", system_name="door_modules",
+         driver_type="h_bridge")
+    _add("zone_body", "inf_hs_11a", "door_lock_front_right",
+         load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0,
+         system_cluster="body_comfort", system_name="door_modules",
+         driver_type="h_bridge")
+    _add("zone_body", "inf_hs_11a", "door_lock_rear_left",
+         load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0,
+         system_cluster="body_comfort", system_name="door_modules",
+         driver_type="h_bridge")
+    _add("zone_body", "inf_hs_11a", "door_lock_rear_right",
+         load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0,
+         system_cluster="body_comfort", system_name="door_modules",
+         driver_type="h_bridge")
+    _add("zone_body", "inf_hs_28a", "pdu_main_feed",
+         system_cluster="power_distribution", system_name="body_power",
+         safety_level="asil_b")
+    _add("zone_body", "inf_hs_14a", "keyless_entry_module",
+         system_cluster="body_comfort", system_name="keyless_access")
+    _add("zone_body", "inf_hs_14a", "immobilizer_relay",
+         system_cluster="body_comfort", system_name="keyless_access")
+    # Infrastructure power
+    _add("zone_body", "inf_hs_100a", "power_supply_body_safety",
+         system_cluster="power_distribution", system_name="infrastructure_power",
+         safety_level="asil_b", power_class="always_on")
+    _add("zone_body", "inf_hs_100a", "power_supply_body_comfort",
+         system_cluster="power_distribution", system_name="infrastructure_power",
+         power_class="always_on")
+    # Cabin climate
+    _add("zone_body", "inf_hs_9a", "hvac_blend_door",
+         system_cluster="body_comfort", system_name="cabin_climate")
+    _add("zone_body", "inf_hs_18a", "ptc_cabin_heater",
+         load_type="ptc", pwm_capable=True,
+         system_cluster="body_comfort", system_name="cabin_climate")
+    _add("zone_body", "inf_hs_2a", "cabin_air_quality_sensor",
+         system_cluster="body_comfort", system_name="cabin_climate")
+    # Body electronics
+    _add("zone_body", "inf_hs_5a", "steering_column_heater",
+         load_type="ptc", pwm_capable=True,
+         system_cluster="body_comfort", system_name="heated_surfaces")
+    _add("zone_body", "inf_hs_5a", "rear_climate_panel",
+         system_cluster="body_comfort", system_name="cabin_climate")
+    _add("zone_body", "inf_hs_2a", "cooled_storage_compartment",
+         system_cluster="body_comfort", system_name="convenience_features")
 
-    # ── Rear zone (10 channels) ──────────────────────────────────
-    _add(
-        "zone_rear",
-        "hs_5a",
-        "tail_light_left",
-        connected_loads=["tail_left", "brake_left"],
-        system_cluster="exterior_lighting",
-        system_name="rear_lighting",
-        pwm_capable=True,
-        power_class="always_on",
-    )
-    _add(
-        "zone_rear",
-        "hs_5a",
-        "tail_light_right",
-        connected_loads=["tail_right", "brake_right"],
-        system_cluster="exterior_lighting",
-        system_name="rear_lighting",
-        pwm_capable=True,
-        power_class="always_on",
-    )
-    _add(
-        "zone_rear",
-        "hs_2a",
-        "chmsl",
-        system_cluster="exterior_lighting",
-        system_name="rear_lighting",
-        power_class="always_on",
-    )
-    _add(
-        "zone_rear",
-        "hs_2a",
-        "license_plate_light",
-        system_cluster="exterior_lighting",
-        system_name="rear_lighting",
-    )
-    _add(
-        "zone_rear",
-        "hs_30a",
-        "rear_defroster",
-        load_type="ptc",
-        system_cluster="body_comfort",
-        system_name="climate",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_rear",
-        "hs_5a",
-        "rear_wiper",
-        load_type="motor",
-        inrush_factor=4.0,
-        inrush_duration_ms=40.0,
-        system_cluster="driver_assist",
-        system_name="wipers",
-    )
-    _add(
-        "zone_rear",
-        "ls_15a",
-        "trunk_latch",
-        load_type="motor",
-        inrush_factor=4.0,
-        inrush_duration_ms=50.0,
-        system_cluster="body_comfort",
-        system_name="closure",
-        driver_type="low_side",
-    )
-    _add(
-        "zone_rear",
-        "hs_20a",
-        "liftgate_motor",
-        load_type="motor",
-        inrush_factor=6.0,
-        inrush_duration_ms=80.0,
-        system_cluster="body_comfort",
-        system_name="closure",
-        driver_type="h_bridge",
-    )
-    _add(
-        "zone_rear",
-        "hs_2a",
-        "parking_sensor_left",
-        system_cluster="adas",
-        system_name="parking",
-        load_type="capacitive",
-    )
-    _add(
-        "zone_rear",
-        "hs_2a",
-        "parking_sensor_right",
-        system_cluster="adas",
-        system_name="parking",
-        load_type="capacitive",
-    )
+    # ── Front zone (15 channels) ─────────────────────────────────
+    # Infrastructure power
+    _add("zone_front", "inf_hs_100a", "power_supply_front_safety",
+         system_cluster="power_distribution", system_name="infrastructure_power",
+         safety_level="asil_b", power_class="always_on")
+    _add("zone_front", "inf_hs_100a", "power_supply_front_aux",
+         system_cluster="power_distribution", system_name="infrastructure_power",
+         power_class="always_on")
+    # HVAC
+    _add("zone_front", "inf_hs_18a", "coolant_heater",
+         load_type="ptc", pwm_capable=True,
+         system_cluster="body_comfort", system_name="cabin_climate")
+    _add("zone_front", "st_hs_50a", "ac_compressor",
+         load_type="motor", inrush_factor=5.0, inrush_duration_ms=80.0,
+         system_cluster="body_comfort", system_name="cabin_climate",
+         pwm_capable=True)
+    _add("zone_front", "inf_hs_14a", "blower_motor",
+         load_type="motor", inrush_factor=4.0, inrush_duration_ms=60.0,
+         system_cluster="body_comfort", system_name="cabin_climate",
+         pwm_capable=True)
+    # Suspension / chassis
+    _add("zone_front", "inf_hs_18a", "active_damper_front",
+         system_cluster="drivetrain", system_name="active_suspension")
+    _add("zone_front", "inf_hs_14a", "supercap_suspension",
+         load_type="capacitive",
+         system_cluster="drivetrain", system_name="active_suspension")
+    # Seat comfort (front)
+    _add("zone_front", "st_dual_14a", "massage_seat_left",
+         system_cluster="body_comfort", system_name="seat_comfort")
+    _add("zone_front", "st_dual_14a", "massage_seat_right",
+         system_cluster="body_comfort", system_name="seat_comfort")
+    # Auxiliary loads / reserves
+    _add("zone_front", "inf_hs_5a", "aux_load_1",
+         system_cluster="auxiliary", system_name="auxiliary_loads")
+    _add("zone_front", "inf_hs_5a", "aux_load_2",
+         system_cluster="auxiliary", system_name="auxiliary_loads")
+    _add("zone_front", "inf_hs_5a", "aux_load_3",
+         system_cluster="auxiliary", system_name="auxiliary_loads")
+    # Body / access
+    _add("zone_front", "inf_hs_14a", "pdu_cross_feed",
+         system_cluster="power_distribution", system_name="body_power")
+    _add("zone_front", "inf_hs_5a", "tire_pressure_module",
+         load_type="capacitive",
+         system_cluster="adas", system_name="tire_monitoring")
+    _add("zone_front", "inf_hs_2a", "reserve_channel",
+         system_cluster="auxiliary", system_name="auxiliary_loads")
 
-    # ── Underhood zone (12 channels) ─────────────────────────────
-    _add(
-        "zone_underhood",
-        "hs_50a",
-        "engine_fan",
-        load_type="motor",
-        inrush_factor=6.0,
-        inrush_duration_ms=100.0,
-        system_cluster="powertrain",
-        system_name="engine_cooling",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_underhood",
-        "hs_30a",
-        "fuel_pump",
-        load_type="motor",
-        inrush_factor=4.0,
-        inrush_duration_ms=60.0,
-        system_cluster="powertrain",
-        system_name="fuel_system",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_underhood",
-        "hs_50a",
-        "starter_relay",
-        load_type="inductive",
-        system_cluster="powertrain",
-        system_name="starting",
-        power_class="start",
-    )
-    _add(
-        "zone_underhood",
-        "hs_50a",
-        "hvac_blower",
-        load_type="motor",
-        inrush_factor=5.0,
-        inrush_duration_ms=80.0,
-        system_cluster="body_comfort",
-        system_name="climate",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_underhood",
-        "hs_20a",
-        "hvac_compressor",
-        load_type="motor",
-        inrush_factor=4.0,
-        inrush_duration_ms=60.0,
-        connected_loads=["ac_compressor_clutch"],
-        system_cluster="body_comfort",
-        system_name="climate",
-    )
-    _add(
-        "zone_underhood",
-        "hs_15a",
-        "coolant_pump",
-        load_type="motor",
-        inrush_factor=3.0,
-        inrush_duration_ms=40.0,
-        system_cluster="powertrain",
-        system_name="engine_cooling",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_underhood",
-        "hs_10a",
-        "throttle_body",
-        load_type="motor",
-        system_cluster="powertrain",
-        system_name="engine_control",
-        driver_type="h_bridge",
-    )
-    _add(
-        "zone_underhood",
-        "hs_5a",
-        "egr_valve",
-        load_type="inductive",
-        system_cluster="powertrain",
-        system_name="emissions",
-        driver_type="half_bridge",
-    )
-    _add(
-        "zone_underhood",
-        "hs_5a",
-        "purge_valve",
-        load_type="inductive",
-        system_cluster="powertrain",
-        system_name="emissions",
-        driver_type="half_bridge",
-    )
-    _add(
-        "zone_underhood",
-        "hs_5a",
-        "o2_sensor_heater_upstream",
-        load_type="ptc",
-        system_cluster="powertrain",
-        system_name="emissions",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_underhood",
-        "hs_5a",
-        "o2_sensor_heater_downstream",
-        load_type="ptc",
-        system_cluster="powertrain",
-        system_name="emissions",
-        pwm_capable=True,
-    )
-    _add(
-        "zone_underhood",
-        "hs_2a",
-        "under_hood_light",
-        system_cluster="interior_lighting",
-        system_name="utility_lights",
-        power_class="always_on",
-    )
+    # ── Central zone (10 channels) ───────────────────────────────
+    # Sensors / misc
+    _add("zone_central", "inf_hs_2a", "climate_sensor_module",
+         load_type="capacitive",
+         system_cluster="body_comfort", system_name="sensor_modules")
+    _add("zone_central", "st_hb_30a", "tailgate_actuator",
+         load_type="motor", inrush_factor=5.0, inrush_duration_ms=60.0,
+         system_cluster="body_comfort", system_name="closure_actuators",
+         driver_type="h_bridge")
+    _add("zone_central", "inf_hs_2a", "interior_reading_light",
+         pwm_capable=True,
+         system_cluster="interior_lighting", system_name="cabin_lights")
+    # Power distribution
+    _add("zone_central", "inf_hs_100a", "main_bus_safety",
+         system_cluster="power_distribution", system_name="main_bus",
+         safety_level="asil_b", power_class="always_on")
+    _add("zone_central", "inf_hs_100a", "main_bus_aux",
+         system_cluster="power_distribution", system_name="main_bus",
+         power_class="always_on")
+    # Infrastructure feeds
+    _add("zone_central", "inf_hs_100a", "power_supply_central_safety",
+         system_cluster="power_distribution", system_name="infrastructure_power",
+         safety_level="asil_b", power_class="always_on")
+    _add("zone_central", "inf_hs_100a", "power_supply_central_aux",
+         system_cluster="power_distribution", system_name="infrastructure_power",
+         power_class="always_on")
+    # Reserves
+    _add("zone_central", "inf_hs_5a", "reserve_1",
+         system_cluster="auxiliary", system_name="auxiliary_loads")
+    _add("zone_central", "inf_hs_5a", "reserve_2",
+         system_cluster="auxiliary", system_name="auxiliary_loads")
+    _add("zone_central", "inf_hs_5a", "reserve_3",
+         system_cluster="auxiliary", system_name="auxiliary_loads")
 
-    assert _ch == 52, f"Expected 52 channels, got {_ch}"
+    assert _ch == 65, f"Expected 65 channels, got {_ch}"
     return zones, specs

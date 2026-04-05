@@ -203,9 +203,9 @@ def test_nominal_has_no_protection_events():
 
 def test_catalog_propagates_dual_adc():
     """build_channels should propagate current/voltage ADC bits from catalog."""
-    from src.config.catalog import build_channels, sedan_topology, EFUSE_CATALOG
+    from src.config.catalog import build_channels, example_topology, EFUSE_CATALOG
 
-    zones, specs = sedan_topology()
+    zones, specs = example_topology()
     channels = build_channels(zones, specs)
     # Pick a channel and verify it inherited the catalog's ADC settings
     ch = channels[0]

@@ -14,7 +14,7 @@ We run on the vehicle (edge-first), score every measurement, and alert when some
 
 ### What's happening in vehicles
 
-Zone Controller ECUs read eFuse registers via SPI every 10–100 ms as part of the CDD (Complex Device Driver) cycle. The raw signals — load current, supply voltage, junction temperature, protection status — ride the CAN bus. In a typical sedan there are 52+ channels across 4 zone controllers.
+Zone Controller ECUs read eFuse registers via SPI every 10–100 ms as part of the CDD (Complex Device Driver) cycle. The raw signals — load current, supply voltage, junction temperature, protection status — ride the CAN bus. In a typical vehicle there are 65+ channels across 4 zone controllers.
 
 ### What's broken
 
@@ -73,8 +73,8 @@ An **edge-deployable, config-driven software pipeline** that:
 |------|--------|
 | **Codebase** | 3 600+ LOC production, 2 600+ LOC tests, 21 commits, 6 YAML configs |
 | **Simulation** | Physics-based: RC thermal, composite noise (pink + quantization + EMI), load-specific inrush (motor, PTC, capacitive), F(i,t) + SCP protection cycling, bus-voltage sag |
-| **eFuse catalog** | 9 IC families (HS_2A → HS_50A, LS_5A, LS_15A) referencing real ICs — BTS7006-1EPP, VN7140AS, TLE92104, VND7140AJ, BTS7004-1EPP, VN9xE30F, BTS81000-SSGI, VNH9045 |
-| **Vehicle topology** | 52-channel sedan across 4 zones, declarative factory, extensible to any vehicle line |
+| **eFuse catalog** | 17 IC families (Infineon + STMicroelectronics, 2A–100A + CUSTOM) with real IC part numbers and validated electrical/thermal parameters |
+| **Vehicle topology** | 65-channel example across 4 zones, declarative factory, extensible to any vehicle line |
 | **Telemetry schema** | `TelemetryRecord` with current, voltage, temperature, trip_flag, overload_flag, `protection_event` (SCP / I²t / thermal_shutdown / latch_off), reset_counter, PWM duty, device_status |
 | **Multi-rate** | CAN (50–100 ms) + XCP dual-raster (10 ms + 50 ms), per-channel `sample_interval_ms`, auto-scaling feature windows |
 | **Feature engine** | 10 derived features with time-based rolling windows |
@@ -210,7 +210,7 @@ Transitions are data-gated, not calendar-gated. The interfaces are designed so m
 |---|---|
 | Partner with 1 eFuse supplier's app engineering team | Signed evaluation agreement |
 | Run VIP on real CAN/XCP data from 1 vehicle platform | Detection report: VIP vs. existing DTCs |
-| Port edge runtime to Jetson | Benchmark: latency, memory, 52-channel throughput |
+| Port edge runtime to Jetson | Benchmark: latency, memory, 65-channel throughput |
 | MQTT alert publishing | Alerts flow from edge to cloud broker |
 | Minimal monitoring dashboard (Grafana/Streamlit) | Real-time channel health view |
 

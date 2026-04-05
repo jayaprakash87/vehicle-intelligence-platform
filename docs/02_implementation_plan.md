@@ -20,11 +20,11 @@ Build the data contract and synthetic data generator. Nothing downstream can be 
 | `configs/default.yaml` | Mixed-fault demo (3 channels, 4 faults) |
 | `configs/nominal.yaml` | Clean baseline |
 | `configs/stress_test.yaml` | All 7 faults on 1 channel |
-| `configs/sedan_52ch.yaml` | Full 4-zone, 52-channel sedan topology |
+| `configs/example_65ch.yaml` | Full 4-zone, 65-channel example topology |
 | `configs/xcp_test_bench.yaml` | XCP dual-raster (10ms + 50ms) |
 | `configs/production_can.yaml` | Production CAN bus rates (50–100ms) |
 
-**Exit criteria:** `TelemetryGenerator.generate()` returns well-shaped DataFrames with physics-realistic signals. Fault windows are visible in raw data. Topology configs expand correctly to 52 channels. YAML configs load without error.
+**Exit criteria:** `TelemetryGenerator.generate()` returns well-shaped DataFrames with physics-realistic signals. Fault windows are visible in raw data. Topology configs expand correctly to 65 channels. YAML configs load without error.
 
 ### Phase 2 — Signal Processing (ingestion + features)
 
@@ -76,7 +76,7 @@ Wire into a runnable system with persistence and both operating modes.
 | `tests/test_edge_cases.py` | Boundary conditions, error paths |
 | `tests/test_hardening.py` | Signal handling, error resilience, heartbeat, metrics |
 | `tests/test_multi_rate.py` | Multi-rate resampling, per-channel intervals, XCP dual-raster |
-| `tests/test_topology.py` | eFuse catalog, sedan topology, channel factory, fleet-scale generation |
+| `tests/test_topology.py` | eFuse catalog, example topology, channel factory, fleet-scale generation |
 | `tests/test_cli.py` | CLI commands, error handling, run-ID isolation |
 | `tests/test_logging.py` | JSON / pretty formats, correlation IDs, idempotent config |
 | `tests/test_storage.py` | Parquet/CSV/JSON round-trip, alert persistence |
@@ -137,10 +137,10 @@ class EdgeConfig(BaseModel):
 
 ```python
 # config/catalog.py
-EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile]    # 9 IC family profiles
+EFUSE_CATALOG: dict[EFuseFamily, EFuseProfile]    # 17 IC family profiles
 
-def sedan_topology() -> tuple[list[ZoneController], list[dict]]:
-    """52-channel, 4-zone sedan configuration."""
+def example_topology() -> tuple[list[ZoneController], list[dict]]:
+    """65-channel, 4-zone example configuration."""
 
 def build_channels(
     zones: list[ZoneController],
@@ -300,6 +300,6 @@ All commands create output in `<output_dir>/<YYYYMMDD-HHMMSS-xxxx>/` to prevent 
 | `configs/default.yaml` | 3 | Mixed faults — quick demo and development |
 | `configs/nominal.yaml` | — | Clean baseline — no faults injected |
 | `configs/stress_test.yaml` | 1 | All 7 faults on a single channel — classifier validation |
-| `configs/sedan_52ch.yaml` | 52 | Full sedan topology — 4 zones, realistic loads |
+| `configs/example_65ch.yaml` | 65 | Full example topology — 4 zones, realistic loads |
 | `configs/xcp_test_bench.yaml` | — | XCP dual-raster DAQ (10ms current + 50ms temperature) |
 | `configs/production_can.yaml` | — | Production CAN bus rates (50–100ms) |

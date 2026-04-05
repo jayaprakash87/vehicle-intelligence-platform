@@ -42,9 +42,9 @@ class SimulationConfig(BaseModel):
         description="Compact channel specs referencing eFuse catalog. Expanded to channels by build_channels().",
     )
     fault_injections: list[FaultInjection] = Field(default_factory=list)
-    vehicle_topology: str = Field(
-        default="",
-        description="Predefined topology name: 'sedan' | '' (use explicit channels)",
+    use_example_topology: bool = Field(
+        default=False,
+        description="When True, populate channels from the built-in 65-channel example topology.",
     )
 
 
@@ -176,8 +176,8 @@ class PlatformConfig(BaseModel):
 def load_config(path: str | Path) -> PlatformConfig:
     """Load a PlatformConfig from a YAML or JSON file.
 
-    After parsing, resolves vehicle topology:
-      - If vehicle_topology is set (e.g. 'sedan'), loads that topology
+    After parsing, resolves the topology:
+      - If use_example_topology is True, populates channels from example_topology()
       - If channel_specs are present, expands them via the eFuse catalog
       - Otherwise uses the explicit channels list as-is
     """
@@ -195,32 +195,19 @@ def default_config() -> PlatformConfig:
 
 
 def _resolve_topology(cfg: PlatformConfig) -> None:
-    """Expand vehicle_topology or channel_specs into concrete channels."""
+    """Populate simulation channels from topology or channel_specs."""
+    from src.config.catalog import build_channels, example_topology
+
     sim = cfg.simulation
 
-    # Named topology takes priority
-    if sim.vehicle_topology:
-        from src.config.catalog import build_channels, sedan_topology
-
-        topologies = {
-            "sedan": sedan_topology,
-        }
-        factory = topologies.get(sim.vehicle_topology)
-        if factory is None:
-            raise ValueError(
-                f"Unknown vehicle_topology '{sim.vehicle_topology}'. "
-                f"Available: {list(topologies.keys())}"
-            )
-        zones, specs = factory()
+    if sim.use_example_topology:
+        zones, specs = example_topology()
         sim.zones = zones
         sim.channels = build_channels(zones, specs)
         return
 
-    # Compact channel_specs with explicit zones
     if sim.channel_specs:
-        from src.config.catalog import build_channels
-
         sim.channels = build_channels(sim.zones, sim.channel_specs)
         return
 
-    # Otherwise: use explicit channels list as-is (backward compatible)
+    # Otherwise: use explicit channels list as-is

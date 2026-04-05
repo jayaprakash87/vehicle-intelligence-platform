@@ -19,14 +19,13 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from src.config.catalog import build_channels, sedan_topology  # noqa: E402
+from src.config.catalog import build_channels, example_topology  # noqa: E402
 from src.config.models import FeatureConfig, ModelConfig, NormalizerConfig, SimulationConfig  # noqa: E402
 from src.features.engine import FeatureEngine  # noqa: E402
 from src.inference.pipeline import InferencePipeline  # noqa: E402
 from src.ingestion.normalizer import Normalizer  # noqa: E402
 from src.models.anomaly import AnomalyDetector  # noqa: E402
 from src.schemas.telemetry import (  # noqa: E402
-    ChannelMeta,
     FaultInjection,
     FaultType,
     ProtectionEvent,
@@ -59,7 +58,7 @@ if _disk_mode:
     run_btn = False
 else:
     # ---------- Simulation mode ----------
-    topology = st.sidebar.selectbox("Vehicle topology", ["sedan (52 ch)", "minimal (3 ch)"])
+    topology = st.sidebar.selectbox("Vehicle topology", ["example (65 ch)"])
     duration_s = st.sidebar.slider("Duration (s)", 5, 120, 30, step=5)
     sample_ms = st.sidebar.selectbox("Sample interval (ms)", [50, 100, 200], index=1)
     seed = st.sidebar.number_input("Random seed", value=42, min_value=0, max_value=9999)
@@ -107,15 +106,8 @@ def run_pipeline(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Generate → normalise → features → train → infer.  Returns (raw, scored, labels)."""
     # Build channels
-    if topo.startswith("sedan"):
-        zones, specs = sedan_topology()
-        channels = build_channels(zones, specs)
-    else:
-        channels = [
-            ChannelMeta(channel_id="ch_01", load_name="headlamp", nominal_current_a=6.0),
-            ChannelMeta(channel_id="ch_02", load_name="defroster", nominal_current_a=12.0),
-            ChannelMeta(channel_id="ch_03", load_name="seat_heater", nominal_current_a=8.0),
-        ]
+    zones, specs = example_topology()
+    channels = build_channels(zones, specs)
 
     faults: list[FaultInjection] = []
     if inject and f_type:

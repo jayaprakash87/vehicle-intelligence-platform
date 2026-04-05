@@ -1,0 +1,50 @@
+# Example vehicle topology — 65 eFuse channels across 4 Zone Controllers
+# Uses the built-in example topology from the eFuse catalog.
+#
+# Architecture:
+#   eFuse IC (HW) → SPI → CDD (Complex Device Driver) → COM → CAN bus
+#   Zone Controller = physical ECU running the CDD software
+#
+# Zone Controllers:
+#   zone_rear     (25 ch) — seating, lighting, infotainment, ADAS, drivetrain
+#   zone_body     (15 ch) — doors, locks, cabin climate, body electronics
+#   zone_front    (15 ch) — power supply, HVAC, suspension, auxiliary loads
+#   zone_central  (10 ch) — power distribution, closures, reserves
+
+simulation:
+  scenario_id: example_full_vehicle
+  name: "Example Full Vehicle — 65 Channels"
+  description: "Generic 4-zone BEV/premium topology with 65 eFuse channels"
+  duration_s: 60.0
+  sample_interval_ms: 100.0
+  seed: 42
+  use_example_topology: true
+
+  fault_injections:
+    # Overload on a rear-zone channel — simulates resistive heater failure
+    - channel_id: ch_017
+      fault_type: overload_spike
+      start_s: 10.0
+      duration_s: 3.0
+      intensity: 0.8
+
+    # Thermal drift on seat heater — PTC aging
+    - channel_id: ch_015
+      fault_type: thermal_drift
+      start_s: 15.0
+      duration_s: 20.0
+      intensity: 0.6
+
+    # Intermittent overload on door lock motor
+    - channel_id: ch_011
+      fault_type: intermittent_overload
+      start_s: 25.0
+      duration_s: 5.0
+      intensity: 0.7
+
+    # Voltage sag on body zone channel
+    - channel_id: ch_041
+      fault_type: voltage_sag
+      start_s: 5.0
+      duration_s: 2.0
+      intensity: 0.9

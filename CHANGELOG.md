@@ -9,8 +9,8 @@ First tagged release — feature-complete MVP with production hardening.
 
 ### Added
 - Physics-based eFuse telemetry generator (RC thermal, F(i,t), composite noise, protection cycles)
-- eFuse IC catalog (9 families — BTS7006, VN7140, TLE6240, etc.) with real part numbers
-- 52-channel, 4-zone sedan vehicle topology
+- eFuse IC catalog (17 IC families — Infineon + STMicroelectronics, 2A–100A + CUSTOM)
+- 65-channel, 4-zone example vehicle topology
 - Multi-rate ingestion with CAN production and XCP dual-raster support
 - Normalizer with resampling to a common time grid
 - Rolling feature engine (RMS current, spike score, temperature slope, trip frequency, degradation trend)
@@ -29,5 +29,5 @@ First tagged release — feature-complete MVP with production hardening.
 - GitHub Actions CI (lint + test on push/PR)
 - Pre-commit hooks (ruff lint/format + fast pytest)
 - Quality-gate regression tests (overload spike F1, thermal/voltage smoke, nominal FP rate)
-- 6 YAML scenario configs (default, nominal, stress test, sedan 52ch, XCP test bench, production CAN)
+- 6 YAML scenario configs (default, nominal, stress test, example 65ch, XCP test bench, production CAN)
 - 246 tests across 20 test files

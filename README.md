@@ -35,8 +35,8 @@ vip edge --data output/<run_id>/telemetry.parquet --max-iter 100
 # Replay real measurement data
 vip replay /path/to/data.mf4 --map-current "I_Ch1_out" --map-voltage "V_Ch1"
 
-# 52-channel sedan topology
-vip simulate --config configs/sedan_52ch.yaml
+# 65-channel example topology
+vip simulate --config configs/example_65ch.yaml
 
 # XCP test-bench dual-raster (10ms + 50ms)
 vip simulate --config configs/xcp_test_bench.yaml
@@ -102,7 +102,7 @@ configs/
 ├── default.yaml              # 3-channel mixed-fault demo
 ├── nominal.yaml              # Clean baseline (no faults)
 ├── stress_test.yaml          # All 7 faults on 1 channel
-├── sedan_52ch.yaml           # Full 4-zone, 52-channel sedan topology
+├── example_65ch.yaml         # Full 4-zone, 65-channel example topology
 ├── xcp_test_bench.yaml       # XCP dual-raster (10ms current + 50ms temperature)
 └── production_can.yaml       # Production CAN bus rates (50–100ms)
 

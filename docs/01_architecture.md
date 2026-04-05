@@ -33,7 +33,7 @@ Zone Controller (ECU)          Zone Controller (ECU)
 ```mermaid
 flowchart LR
     subgraph Data Generation
-        CAT[eFuse Catalog<br/>9 IC families] --> TOPO[Vehicle Topology<br/>4 zones · 52 channels]
+        CAT[eFuse Catalog<br/>17 IC families] --> TOPO[Vehicle Topology<br/>4 zones · 65 channels]
         CFG[YAML Config] --> SIM[Simulator]
         TOPO --> SIM
         SIM --> RAW["Raw Telemetry<br/>(DataFrame)"]
@@ -171,14 +171,14 @@ Each family defines electrical and thermal defaults used by the simulator.
 | `LS_5A` | 3 | 7 | 0.070 | 60 | 10 |
 | `LS_15A` | 10 | 20 | 0.015 | 35 | 15 |
 
-### Sedan Topology — 4 Zones, 52 Channels
+### Example Topology — 4 Zones, 65 Channels
 
 | Zone | Location | Bus | CDD Cycle | Channels | Example Loads |
 |------|----------|-----|-----------|----------|---------------|
-| Body | Passenger cabin | CAN | 100ms | 16 | Interior lights, mirrors, locks, windows |
-| Front | Front module | CAN | 50ms | 14 | Headlamps, wipers, horn, ADAS sensors |
-| Rear | Rear module | CAN | 100ms | 10 | Tail lights, defroster, trunk actuator |
-| Underhood | Engine bay | CAN | 50ms | 12 | Engine fan, fuel pump, HVAC, starter relay |
+| Rear | Rear module | CAN | 100ms | 25 | Seating, lighting, infotainment, ADAS, drivetrain |
+| Body | Passenger cabin | CAN | 100ms | 15 | Doors, locks, cabin climate, body electronics |
+| Front | Front module | CAN | 50ms | 15 | Power supply, HVAC, suspension, auxiliary loads |
+| Central | Central gateway | CAN | 50ms | 10 | Power distribution, closures, reserves |
 
 ### Channel Factory
 

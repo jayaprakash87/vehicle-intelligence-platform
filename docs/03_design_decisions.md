@@ -133,11 +133,11 @@ Architecture Decision Records (ADRs) for choices that shaped the system. For sys
 **Context:** The original MVP used flat channel definitions (3 channels with manually specified parameters). Scaling to realistic vehicle configurations (50+ channels) with this approach requires duplicating hundreds of lines of YAML and risks inconsistent electrical parameters.
 
 **Decision:** Introduce a two-layer abstraction:
-1. **eFuse Catalog** (`EFUSE_CATALOG`) — 9 IC family profiles (HS_2A through HS_50A, plus LS variants) with validated electrical and thermal defaults (R_ds_on, R_thermal, τ, nominal/max current).
-2. **Vehicle Topology Factory** — `sedan_topology()` returns a declarative 4-zone, 52-channel configuration. `build_channels()` expands compact channel specs into full `ChannelMeta` by inheriting catalog defaults and zone-level settings.
+1. **eFuse Catalog** (`EFUSE_CATALOG`) — 17 IC family profiles (Infineon + STMicroelectronics, 2A through 100A, plus CUSTOM) with validated electrical and thermal defaults (R_ds_on, R_thermal, τ, nominal/max current).
+2. **Vehicle Topology Factory** — `example_topology()` returns a declarative 4-zone, 65-channel configuration. `build_channels()` expands compact channel specs into full `ChannelMeta` by inheriting catalog defaults and zone-level settings.
 
 **Alternatives rejected:**
-- Flat YAML with all 52 channels fully specified — massive duplication, easy to introduce inconsistent R_ds_on values for the same IC family.
+- Flat YAML with all 65 channels fully specified — massive duplication, easy to introduce inconsistent R_ds_on values for the same IC family.
 - Database-backed catalog — over-engineered for an MVP; YAML + Python dict is sufficient.
 
 **Consequences:** Adding a new vehicle topology (SUV, truck) requires only a new factory function that returns zone controllers and channel specs. The catalog is reused across all topologies. Per-channel overrides still work for special cases.
