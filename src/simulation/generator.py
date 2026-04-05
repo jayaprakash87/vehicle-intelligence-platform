@@ -91,6 +91,15 @@ class TelemetryGenerator:
         telem_df = pd.concat(all_telem, ignore_index=True) if all_telem else pd.DataFrame()
         labels_df = pd.concat(all_labels, ignore_index=True) if all_labels else pd.DataFrame()
 
+        # --- Multi-channel die thermal coupling ---
+        # Channels sharing the same die_id exchange heat through the substrate.
+        # For each die group, the steady-state ΔT of every other channel on the
+        # same die is injected into this channel scaled by thermal_coupling_coeff.
+        # ΔT_neighbour = (T_mean - T_ambient) is the heat source;
+        # We add k × ΔT_neighbour to the target channel's temperature array.
+        if not telem_df.empty and "temperature_c" in telem_df.columns:
+            telem_df = self._apply_die_thermal_coupling(telem_df)
+
         log.info(
             "Generated %d telemetry rows, %d labels across %d channels",
             len(telem_df),
@@ -101,6 +110,71 @@ class TelemetryGenerator:
 
     # ------------------------------------------------------------------
     # Bus voltage generation (shared across channels)
+    # ------------------------------------------------------------------
+
+    def _apply_die_thermal_coupling(self, telem_df: pd.DataFrame) -> pd.DataFrame:
+        """Inject cross-channel die heat into co-located channels.
+
+        For each die group (channels with same non-empty die_id):
+          - Compute each channel's per-sample ΔT above ambient
+          - Sum-and-scale the neighbour contributions: ΔT_coupled = k × Σ ΔT_j (j ≠ i)
+          - Add to the target channel's temperature_c array, clipped to thermal_shutdown_c + 10
+        """
+        # Build a lookup: channel_id → ChannelMeta
+        ch_map = {ch.channel_id: ch for ch in self.cfg.channels}
+
+        # Group channels by die_id (skip empty / isolated channels)
+        die_groups: dict[str, list[str]] = {}
+        for ch in self.cfg.channels:
+            if ch.die_id:
+                die_groups.setdefault(ch.die_id, []).append(ch.channel_id)
+
+        # Only process dies with ≥ 2 channels
+        for die_id, members in die_groups.items():
+            if len(members) < 2:
+                continue
+
+            # Extract temperature arrays for all members (aligned by position in DataFrame)
+            # Channels may have different sample rates — work channel-by-channel
+            for ch_id in members:
+                ch = ch_map[ch_id]
+                target_mask = telem_df["channel_id"] == ch_id
+                target_temps = telem_df.loc[target_mask, "temperature_c"].to_numpy(dtype=float)
+                n_target = len(target_temps)
+
+                coupled_delta = np.zeros(n_target, dtype=float)
+
+                for nbr_id in members:
+                    if nbr_id == ch_id:
+                        continue
+                    nbr = ch_map[nbr_id]
+                    nbr_mask = telem_df["channel_id"] == nbr_id
+                    nbr_temps = telem_df.loc[nbr_mask, "temperature_c"].to_numpy(dtype=float)
+                    n_nbr = len(nbr_temps)
+
+                    # ΔT of neighbour above its own ambient
+                    nbr_ambient = nbr.t_ambient_c
+                    nbr_delta = np.clip(nbr_temps - nbr_ambient, 0.0, None)
+
+                    # Resample to target length (nearest-neighbour; handles different rates)
+                    if n_nbr != n_target:
+                        idx = np.round(np.linspace(0, n_nbr - 1, n_target)).astype(int)
+                        nbr_delta = nbr_delta[idx]
+
+                    # Average coupling coefficient between the two channels
+                    k = (ch.thermal_coupling_coeff + nbr.thermal_coupling_coeff) / 2.0
+                    coupled_delta += k * nbr_delta
+
+                # Apply coupling: raise target temperature by the summed neighbour contribution
+                new_temps = target_temps + coupled_delta
+                shutdown_limit = ch.thermal_shutdown_c + 10.0
+                new_temps = np.clip(new_temps, -40.0, shutdown_limit)
+                telem_df.loc[target_mask, "temperature_c"] = new_temps
+
+        return telem_df
+
+    # ------------------------------------------------------------------
+    # Bus voltage generation
     # ------------------------------------------------------------------
 
     def _generate_bus_voltage(self, n: int, interval_s: float) -> np.ndarray:

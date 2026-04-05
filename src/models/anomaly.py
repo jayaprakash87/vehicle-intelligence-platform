@@ -241,6 +241,21 @@ class RulesFaultClassifier:
                 causes.append("Sustained temperature rise — check cooling or load current")
             return FaultType.THERMAL_DRIFT, min(0.7 + thermal_shutdown_count * 0.1, 1.0), causes
 
+        # --- Die thermal coupling — heat without elevated current ---
+        # Signature: moderate temperature rise (0.1–0.4 °C/sample) but current is nominal
+        # (spike_score low, no trip). Cannot be self-generated if power ≈ normal.
+        # Slopes > 0.4 are classified as THERMAL_DRIFT (own-channel heating).
+        if 0.1 < temp_slope < 0.4 and spike < 1.5 and not trip and not overload:
+            rms_i = r.get("rolling_rms_current", 0) or 0
+            nom_i = r.get("current_a", 0) or 0
+            # Only fire if current is within 20 % of expected — ruling out thermal drift
+            if nom_i > 0 and abs(rms_i - nom_i) / nom_i < 0.20:
+                causes.append(
+                    "Temperature rising without corresponding current increase — "
+                    "likely cross-die thermal coupling from active neighbour channel"
+                )
+                return FaultType.THERMAL_COUPLING, min(temp_slope / 0.5, 1.0), causes
+
         # Dropped packets — high missing data rate
         if missing_rate > 0.1:
             causes.append("High rate of missing signal samples indicates packet loss")

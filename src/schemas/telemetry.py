@@ -73,6 +73,7 @@ class FaultType(str, Enum):
     LOAD_DUMP = "load_dump"  # Alternator load dump ISO 16750-2: 40 V spike / ~400 ms
     COLD_CRANK = "cold_crank"  # Cold-crank battery sag: bus 7–9 V / 3–5 s
     CONNECTOR_AGING = "connector_aging"  # Fretting/oxidation raises harness contact resistance
+    THERMAL_COUPLING = "thermal_coupling"  # Elevated temp from co-die neighbour channel(s)
 
 
 class SourceProtocol(str, Enum):
@@ -517,6 +518,21 @@ class ChannelMeta(BaseModel):
     connector_r_ohm: float = Field(
         default=0.010,
         description="Sum of pin/terminal contact resistance Ω on this harness leg (typ. 10–20 mΩ fresh)",
+    )
+
+    # --- Multi-channel die thermal coupling ---
+    # eFuse ICs with multiple outputs (e.g. TLE92104 4-channel, VND7140 dual) share a
+    # silicon die. Power dissipated by one channel heats the substrate, raising the
+    # junction temperature of all channels on the same die. Thermal coupling fraction
+    # k_th ≈ 0.10–0.25 for PROFET+2-class devices (10–25 % of neighbour heat injected).
+    # Channels with the same die_id are thermally coupled; empty string = isolated.
+    die_id: str = Field(
+        default="",
+        description="Shared die identifier — channels with the same non-empty die_id are thermally coupled",
+    )
+    thermal_coupling_coeff: float = Field(
+        default=0.15,
+        description="Fraction of each co-die channel's steady-state ΔT injected into this channel (typ. 0.10–0.25)",
     )
 
 
