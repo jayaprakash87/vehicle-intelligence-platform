@@ -541,6 +541,78 @@ class TelemetryGenerator:
                     if diag_start < end_idx:
                         protection_event[diag_start:end_idx] = ProtectionEvent.OPEN_LOAD_DIAG.value
 
+                case FaultType.JUMP_START:
+                    # External jump-start / booster connected: bus rises to 16–24 V.
+                    # eFuse ICs have internal over-voltage clamps (typ. 28–36 V); below
+                    # that the load sees elevated voltage — current scales ∝ V/R for
+                    # resistive loads.  Some ICs set an over-voltage status bit.
+                    # Model: linear ramp up within first 5 % of window, hold at elevated
+                    # level, then ramp back over last 10 % (charger disconnected).
+                    v_jump = 13.5 + fi.intensity * 10.5  # 16–24 V depending on intensity
+                    envelope = self._fault_envelope_rise_fall(
+                        n_fault, rise_frac=0.05, fall_frac=0.10
+                    )
+                    bus_voltage[sl] = 13.5 + (v_jump - 13.5) * envelope
+                    # Voltage at load follows bus (negligible harness drop at low current)
+                    voltage[sl] = bus_voltage[sl] + self.rng.normal(0, 0.05, n_fault)
+                    # Resistive load current scales with voltage ratio
+                    v_ratio = bus_voltage[sl] / 13.5
+                    current[sl] = ch.nominal_current_a * v_ratio + self._composite_noise(n_fault, ch)
+                    # IC reports over-voltage event once bus exceeds 16 V
+                    ov_mask = bus_voltage[sl] > 16.0
+                    protection_event[start_idx:end_idx][ov_mask] = ProtectionEvent.OVER_VOLTAGE.value
+                    status[sl] = DeviceStatus.WARNING.value
+
+                case FaultType.LOAD_DUMP:
+                    # ISO 16750-2 load dump: alternator field collapses when a large
+                    # battery/load is suddenly disconnected.  Bus spikes to ~40 V for
+                    # 50–400 ms then decays exponentially back to ~13.5 V.
+                    # Model: fast rise (1 % of window) to 40 V, exponential decay τ ≈ 15 %
+                    # of window back to nominal.
+                    v_peak = 40.0 * fi.intensity  # ~28–40 V
+                    t_norm = np.linspace(0, 1, n_fault)
+                    # Fast spike then exponential decay
+                    tau_norm = 0.15  # decay time constant as fraction of window
+                    spike = v_peak * np.exp(-t_norm / tau_norm)
+                    bus_voltage[sl] = 13.5 + spike + self.rng.normal(0, 0.2, n_fault)
+                    voltage[sl] = bus_voltage[sl] + self.rng.normal(0, 0.1, n_fault)
+                    # IC over-voltage clamp fires — current briefly spikes then IC shuts off
+                    peak_samples = max(int(n_fault * 0.05), 1)
+                    current[start_idx : start_idx + peak_samples] *= 1.5  # brief inrush
+                    current[start_idx + peak_samples : end_idx] = self.rng.normal(
+                        0.001, 0.0005, n_fault - peak_samples
+                    )  # IC off during clamp
+                    state[start_idx + peak_samples : end_idx] = False
+                    trip[start_idx : end_idx] = True
+                    protection_event[start_idx:end_idx] = ProtectionEvent.OVER_VOLTAGE.value
+                    status[sl] = DeviceStatus.FAULT.value
+
+                case FaultType.COLD_CRANK:
+                    # Cold-crank battery sag: starter motor draws 200–600 A, bus collapses
+                    # to 7–9 V for 3–5 s then recovers as engine fires.
+                    # ISO 16750-2 profile: 30 ms pre-crank at nominal, drop to 6 V, recover
+                    # linearly over crank window.  Model uses a U-shape.
+                    v_sag = 13.5 - fi.intensity * 6.5  # 7–13.5 V
+                    # U-shape: ramp down in first 10 %, hold at sag, ramp up over last 20 %
+                    ramp_down = max(int(n_fault * 0.10), 1)
+                    hold_end = max(int(n_fault * 0.80), ramp_down + 1)
+                    ramp_up_n = n_fault - hold_end
+                    crank_v = np.empty(n_fault)
+                    crank_v[:ramp_down] = np.linspace(13.5, v_sag, ramp_down)
+                    crank_v[ramp_down:hold_end] = v_sag
+                    if ramp_up_n > 0:
+                        crank_v[hold_end:] = np.linspace(v_sag, 13.5, ramp_up_n)
+                    bus_voltage[sl] = crank_v + self.rng.normal(0, 0.15, n_fault)
+                    voltage[sl] = bus_voltage[sl] + self.rng.normal(0, 0.08, n_fault)
+                    # Resistive loads see reduced current proportional to voltage sag
+                    v_ratio_crank = np.clip(bus_voltage[sl] / 13.5, 0.3, 1.2)
+                    current[sl] = ch.nominal_current_a * v_ratio_crank + self._composite_noise(n_fault, ch)
+                    # Under-voltage warning when bus < 9 V
+                    uv_mask = bus_voltage[sl] < 9.0
+                    status[start_idx:end_idx] = np.where(
+                        uv_mask, DeviceStatus.FAULT.value, DeviceStatus.WARNING.value
+                    )
+
             fault_active[sl] = fi.fault_type.value
             severity[sl] = fi.intensity
 

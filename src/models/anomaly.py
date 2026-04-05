@@ -186,6 +186,26 @@ class RulesFaultClassifier:
 
         causes: list[str] = []
 
+        # --- Bus over-voltage (load dump / jump start) ---
+        ov_count = r.get("over_voltage_count", 0) or 0
+        max_v = r.get("rolling_max_voltage", voltage) or voltage
+        if pe == ProtectionEvent.OVER_VOLTAGE.value or ov_count > 0 or max_v > 16.0:
+            if max_v > 30.0 or (ov_count > 0 and voltage > 20.0):
+                causes.append(
+                    "Bus voltage spike detected — ISO 16750-2 load dump (alternator field collapse)"
+                )
+                return FaultType.LOAD_DUMP, min(0.7 + ov_count * 0.05, 1.0), causes
+            causes.append("Bus voltage elevated above 16 V — external jump-start or booster connected")
+            return FaultType.JUMP_START, min(0.65 + ov_count * 0.05, 1.0), causes
+
+        # --- Cold crank under-voltage ---
+        min_v = r.get("rolling_min_voltage", voltage) or voltage
+        if min_v < 9.0:
+            causes.append(
+                f"Bus voltage dipped to {min_v:.1f} V — cold-crank battery sag during engine start"
+            )
+            return FaultType.COLD_CRANK, min((13.5 - min_v) / 6.5, 1.0), causes
+
         # --- Open load: IC DIAGNOSIS confirmed wire break / terminal open ---
         # Detect: (a) explicit DIAGNOSIS event in protection_event, or
         #         (b) channel commanded ON but rolling mean current is negligible.

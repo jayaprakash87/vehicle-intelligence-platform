@@ -56,6 +56,7 @@ class ProtectionEvent(str, Enum):
     THERMAL_SHUTDOWN = "thermal_shutdown"  # Junction temperature exceeded limit
     LATCH_OFF = "latch_off"  # Max retries exhausted — channel locked off
     OPEN_LOAD_DIAG = "open_load_diag"  # Open-load confirmed by IC DIAGNOSIS cycle
+    OVER_VOLTAGE = "over_voltage"  # IC over-voltage clamp / shutdown (load dump / jump start)
 
 
 class FaultType(str, Enum):
@@ -68,6 +69,9 @@ class FaultType(str, Enum):
     DROPPED_PACKET = "dropped_packet"
     GRADUAL_DEGRADATION = "gradual_degradation"
     OPEN_LOAD = "open_load"  # Wire break / terminal corrosion — I≈0 while commanded ON
+    JUMP_START = "jump_start"  # External jump-start / booster: bus 16–24 V sustained
+    LOAD_DUMP = "load_dump"  # Alternator load dump ISO 16750-2: 40 V spike / ~400 ms
+    COLD_CRANK = "cold_crank"  # Cold-crank battery sag: bus 7–9 V / 3–5 s
 
 
 class SourceProtocol(str, Enum):

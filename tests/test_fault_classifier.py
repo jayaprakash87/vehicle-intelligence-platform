@@ -1,9 +1,9 @@
-"""Parametrized tests for all 7 fault types in RulesFaultClassifier."""
+"""Parametrized tests for all 10 fault types in RulesFaultClassifier."""
 
 import pytest
 
 from src.models.anomaly import RulesFaultClassifier
-from src.schemas.telemetry import FaultType
+from src.schemas.telemetry import FaultType, ProtectionEvent
 
 
 _BASE_ROW = {
@@ -16,6 +16,10 @@ _BASE_ROW = {
     "rolling_rms_current": 5.0,
     "current_a": 5.0,
     "voltage_v": 13.5,
+    "rolling_min_voltage": 13.0,
+    "rolling_max_voltage": 14.0,
+    "over_voltage_count": 0,
+    "protection_event": ProtectionEvent.NONE.value,
     "missing_rate": 0.0,
 }
 
@@ -46,7 +50,21 @@ def _row(**overrides) -> dict:
         ),
         # 7. Dropped packet — high missing rate
         ({"missing_rate": 0.25}, FaultType.DROPPED_PACKET),
-        # 8. Nominal — all values normal
+        # 8. Jump start — bus elevated above 16 V
+        (
+            {"rolling_max_voltage": 18.0, "voltage_v": 18.0,
+             "over_voltage_count": 2, "protection_event": ProtectionEvent.OVER_VOLTAGE.value},
+            FaultType.JUMP_START,
+        ),
+        # 9. Load dump — bus spike above 30 V
+        (
+            {"rolling_max_voltage": 35.0, "voltage_v": 35.0,
+             "over_voltage_count": 4, "protection_event": ProtectionEvent.OVER_VOLTAGE.value},
+            FaultType.LOAD_DUMP,
+        ),
+        # 10. Cold crank — bus sag below 9 V
+        ({"rolling_min_voltage": 7.5, "voltage_v": 8.0}, FaultType.COLD_CRANK),
+        # 11. Nominal — all values normal
         ({}, FaultType.NONE),
     ],
     ids=[
@@ -57,6 +75,9 @@ def _row(**overrides) -> dict:
         "gradual_degradation",
         "noisy_sensor",
         "dropped_packet",
+        "jump_start",
+        "load_dump",
+        "cold_crank",
         "nominal",
     ],
 )

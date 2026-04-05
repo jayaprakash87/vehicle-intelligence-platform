@@ -102,6 +102,7 @@ class FeatureEngine:
                 ProtectionEvent.LATCH_OFF,
                 ProtectionEvent.THERMAL_SHUTDOWN,
                 ProtectionEvent.OPEN_LOAD_DIAG,
+                ProtectionEvent.OVER_VOLTAGE,
             ):
                 col_name = f"{event.value}_count"
                 df[col_name] = df.groupby("channel_id")["protection_event"].transform(
@@ -113,6 +114,15 @@ class FeatureEngine:
         # Anomaly score placeholder (filled by model layer later)
         if "anomaly_score" not in df.columns:
             df["anomaly_score"] = 0.0
+
+        # Rolling bus voltage stats (for over-voltage / under-voltage detection)
+        if "voltage_v" in df.columns:
+            df["rolling_min_voltage"] = grouped["voltage_v"].transform(
+                lambda s: s.rolling(w, min_periods=mp).min()
+            )
+            df["rolling_max_voltage"] = grouped["voltage_v"].transform(
+                lambda s: s.rolling(w, min_periods=mp).max()
+            )
 
         log.info("Computed features for %d rows", len(df))
         return df
