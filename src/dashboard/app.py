@@ -28,9 +28,12 @@ from src.models.anomaly import AnomalyDetector  # noqa: E402
 from src.schemas.telemetry import (  # noqa: E402
     FaultInjection,
     FaultType,
+    HealthBand,
     ProtectionEvent,
 )
 from src.simulation.generator import TelemetryGenerator  # noqa: E402
+from src.edge.cycle import CycleAccumulator  # noqa: E402
+from src.edge.lifetime import LifetimeHealthTracker  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -226,6 +229,37 @@ scored: pd.DataFrame = st.session_state["scored"]
 labels: pd.DataFrame = st.session_state["labels"]
 
 # ---------------------------------------------------------------------------
+# Compute cycle + lifetime tracking
+# ---------------------------------------------------------------------------
+
+
+@st.cache_data(show_spinner="Computing cycle & lifetime health…")
+def _compute_cycle_lifetime(scored_json: str) -> tuple[list[dict], dict | None]:
+    """Run cycle accumulation and lifetime tracking on scored data."""
+    import io
+    _scored = pd.read_json(io.StringIO(scored_json), orient="split")
+    acc = CycleAccumulator(cycle_type="ignition")
+    summaries = acc.ingest(_scored)
+    final = acc.close()
+    if final:
+        summaries.append(final)
+
+    lifetime_state = None
+    if summaries:
+        tracker = LifetimeHealthTracker(upper_bins=2, trend_window=5)
+        for s in summaries:
+            lifetime_state = tracker.ingest(s)
+
+    summary_dicts = [s.model_dump(mode="json") for s in summaries]
+    state_dict = lifetime_state.model_dump(mode="json") if lifetime_state else None
+    return summary_dicts, state_dict
+
+
+cycle_summaries_raw, lifetime_state_raw = _compute_cycle_lifetime(
+    scored.to_json(orient="split", date_format="iso")
+)
+
+# ---------------------------------------------------------------------------
 # Header metrics
 # ---------------------------------------------------------------------------
 
@@ -272,8 +306,8 @@ view = scored[scored["channel_id"].isin(selected_channels)].copy()
 # Tab layout
 # ---------------------------------------------------------------------------
 
-tab_signals, tab_anomaly, tab_faults, tab_protection, tab_summary = st.tabs(
-    ["📈 Signals", "🔍 Anomalies", "⚠️ Faults", "🛡️ Protection Events", "📊 Summary"]
+tab_signals, tab_anomaly, tab_faults, tab_protection, tab_cycles, tab_lifetime, tab_summary = st.tabs(
+    ["📈 Signals", "🔍 Anomalies", "⚠️ Faults", "🛡️ Protection Events", "🔄 Cycle Health", "📉 Lifetime Health", "📊 Summary"]
 )
 
 # ---- Signals tab ----
@@ -458,6 +492,129 @@ with tab_protection:
     else:
         st.info("Protection event data not available.")
 
+# ---- Cycle Health tab ----
+with tab_cycles:
+    st.subheader("Cycle health")
+
+    if cycle_summaries_raw:
+        cycle_df = pd.DataFrame(cycle_summaries_raw)
+
+        # Metrics row
+        n_cycles = len(cycle_df)
+        avg_stress = cycle_df["cycle_stress"].mean()
+        worst_band = cycle_df["health_band"].value_counts().index[0]
+        cc1, cc2, cc3, cc4 = st.columns(4)
+        cc1.metric("Cycles detected", n_cycles)
+        cc2.metric("Avg stress", f"{avg_stress:.3f}")
+        cc3.metric("Most common band", worst_band)
+        cc4.metric("Total anomalies", int(cycle_df["anomaly_count"].sum()))
+
+        # Health band distribution
+        band_counts = cycle_df["health_band"].value_counts().reset_index()
+        band_counts.columns = ["band", "count"]
+        band_order = [b.value for b in HealthBand]
+        band_colors = {"nominal": "#2ecc71", "monitor": "#f39c12", "degraded": "#e67e22", "critical": "#e74c3c"}
+        fig_bands = px.bar(
+            band_counts,
+            x="band",
+            y="count",
+            color="band",
+            color_discrete_map=band_colors,
+            title="Cycle health band distribution",
+            category_orders={"band": band_order},
+        )
+        fig_bands.update_layout(height=300, margin=dict(t=40, b=30), showlegend=False)
+        st.plotly_chart(fig_bands, use_container_width=True)
+
+        # Stress over cycles
+        cycle_df["cycle_index"] = range(1, len(cycle_df) + 1)
+        fig_stress = px.bar(
+            cycle_df,
+            x="cycle_index",
+            y="cycle_stress",
+            color="health_band",
+            color_discrete_map=band_colors,
+            title="Cycle stress per cycle",
+            labels={"cycle_index": "Cycle #", "cycle_stress": "Stress score"},
+        )
+        fig_stress.update_layout(height=300, margin=dict(t=40, b=30))
+        st.plotly_chart(fig_stress, use_container_width=True)
+
+        # Cycle detail table
+        display_cols = [
+            "cycle_id", "cycle_type", "duration_s", "sample_count",
+            "anomaly_count", "trip_count", "retry_count",
+            "peak_current_a", "peak_temperature_c",
+            "cycle_stress", "health_band", "dominant_fault",
+        ]
+        available = [c for c in display_cols if c in cycle_df.columns]
+        st.dataframe(cycle_df[available], use_container_width=True)
+    else:
+        st.info("No cycle boundaries detected. Cycle tracking requires `state_on_off` transitions in the data.")
+
+# ---- Lifetime Health tab ----
+with tab_lifetime:
+    st.subheader("Lifetime health — load spectra")
+
+    if lifetime_state_raw:
+        # Header metrics
+        lc1, lc2, lc3, lc4 = st.columns(4)
+        lc1.metric("Health score", f"{lifetime_state_raw['health_score']:.3f}")
+        lc2.metric("Health band", lifetime_state_raw["health_band"])
+        lc3.metric("Trend", lifetime_state_raw["trend"])
+        lc4.metric("Cycles ingested", lifetime_state_raw["cycles_ingested"])
+
+        # Build histogram data for visualization
+        hist_configs = [
+            ("peak_current_hist", "Peak Current (A)"),
+            ("peak_temperature_hist", "Peak Temperature (°C)"),
+            ("cycle_stress_hist", "Cycle Stress"),
+            ("trips_per_cycle_hist", "Trips per Cycle"),
+            ("retries_per_cycle_hist", "Retries per Cycle"),
+            ("thermal_dwell_frac_hist", "Thermal Dwell Fraction"),
+        ]
+
+        # Two histograms per row
+        for i in range(0, len(hist_configs), 2):
+            cols = st.columns(2)
+            for j, col in enumerate(cols):
+                if i + j >= len(hist_configs):
+                    break
+                key, title = hist_configs[i + j]
+                hist = lifetime_state_raw[key]
+                edges = hist["edges"]
+                counts = hist["counts"]
+
+                # Build bin labels
+                labels = []
+                for k, c in enumerate(counts):
+                    if k == 0:
+                        labels.append(f"< {edges[0]}")
+                    elif k < len(edges):
+                        labels.append(f"{edges[k-1]}–{edges[k]}")
+                    else:
+                        labels.append(f"≥ {edges[-1]}")
+
+                hist_df = pd.DataFrame({"bin": labels, "count": counts})
+                fig_h = px.bar(
+                    hist_df,
+                    x="bin",
+                    y="count",
+                    title=title,
+                    color="count",
+                    color_continuous_scale="YlOrRd",
+                )
+                fig_h.update_layout(
+                    height=280,
+                    margin=dict(t=40, b=30),
+                    xaxis_title="Bin",
+                    yaxis_title="Cycles",
+                    coloraxis_showscale=False,
+                )
+                col.plotly_chart(fig_h, use_container_width=True)
+    else:
+        st.info("No lifetime health data. Requires at least one completed cycle.")
+
 # ---- Summary tab ----
 with tab_summary:
     st.subheader("Per-channel summary")
@@ -514,4 +671,4 @@ with tab_summary:
 # ---------------------------------------------------------------------------
 
 st.sidebar.markdown("---")
-st.sidebar.caption("VIP v0.1 — Vehicle Intelligence Platform")
+st.sidebar.caption("VIP v0.2 — Vehicle Intelligence Platform")
