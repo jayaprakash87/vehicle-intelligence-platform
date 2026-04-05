@@ -271,6 +271,22 @@ class RulesFaultClassifier:
                 causes.append("Sudden high current draw exceeding fuse rating")
             return FaultType.OVERLOAD_SPIKE, min(spike / 6.0, 1.0), causes
 
+        # Wake transient — brief high current spike without trip (normal inrush gone wrong)
+        # Signature: spike_score elevated, NOT tripped, rolling_min_current recently near-zero
+        min_i = r.get("rolling_min_current", None)
+        if (
+            spike > 2.0
+            and not trip
+            and not overload
+            and min_i is not None
+            and min_i < 0.01  # was near-zero recently (was sleeping)
+        ):
+            causes.append(
+                "Current spike immediately following near-zero period — "
+                "excessive wake inrush or capacitive load charging on KL15/KLR rail"
+            )
+            return FaultType.WAKE_TRANSIENT, min(spike / 5.0, 1.0), causes
+
         # Intermittent overload — moderate spike + repeating trips
         if trip_freq > 2 and overload:
             causes.append("Repeated transient overcurrent events")

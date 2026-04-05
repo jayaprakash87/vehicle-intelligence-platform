@@ -11,7 +11,26 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field
 
-from src.schemas.telemetry import ChannelMeta, FaultInjection, ZoneController
+from src.schemas.telemetry import ChannelMeta, FaultInjection, PowerState, ZoneController
+
+
+# ---------------------------------------------------------------------------
+# Power state timeline
+# ---------------------------------------------------------------------------
+
+
+class PowerStateEvent(BaseModel):
+    """A power-state transition at a given time offset in the scenario.
+
+    Example timeline — ignition cycle with cold crank:
+      t=0s  SLEEP   (vehicle parked)
+      t=5s  CRANK   (starter engaged)
+      t=8s  ACTIVE  (engine running, KL15 on)
+      t=55s SLEEP   (ignition off)
+    """
+
+    time_s: float = Field(ge=0.0, description="Seconds from scenario start for this transition")
+    state: PowerState = Field(description="Target power state at this time")
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +61,13 @@ class SimulationConfig(BaseModel):
         description="Compact channel specs referencing eFuse catalog. Expanded to channels by build_channels().",
     )
     fault_injections: list[FaultInjection] = Field(default_factory=list)
+    power_state_events: list["PowerStateEvent"] = Field(
+        default_factory=list,
+        description=(
+            "Ordered list of power-state transitions. Empty = always ACTIVE. "
+            "First entry need not start at t=0 — state before first event is ACTIVE."
+        ),
+    )
     use_example_topology: bool = Field(
         default=False,
         description="When True, populate channels from the built-in 65-channel example topology.",

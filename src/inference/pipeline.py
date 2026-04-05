@@ -112,5 +112,6 @@ def _recommend_action(fault: FaultType, score: float) -> str:
         FaultType.COLD_CRANK: "Check battery state-of-health and cold-cranking amps (CCA); inspect battery terminals for corrosion",
         FaultType.CONNECTOR_AGING: "Inspect harness connectors and crimp terminals for fretting wear or oxidation; re-terminate or replace corroded pins",
         FaultType.THERMAL_COUPLING: "Identify high-current co-die neighbour channel; verify per-channel de-rating meets shared-die thermal budget (check IC application note)",
+        FaultType.WAKE_TRANSIENT: "Check eFuse inrush rating vs load capacitance; add pre-charge resistor or stagger KL15 turn-on sequence to limit simultaneous wake inrush",
     }
     return actions.get(fault, "Investigate further")

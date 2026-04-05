@@ -23,6 +23,8 @@ from src.schemas.telemetry import (
     DeviceStatus,
     FaultInjection,
     FaultType,
+    PowerClass,
+    PowerState,
     ProtectionEvent,
 )
 from src.utils.logging import get_logger
@@ -60,6 +62,9 @@ class TelemetryGenerator:
         bus_voltage_fine = self._generate_bus_voltage(n_finest, finest_s)
         np.arange(n_finest) * finest_s  # seconds from t0
 
+        # Power-state timeline: build per-sample array at finest resolution
+        power_states_fine = self._build_power_state_array(n_finest, finest_s)
+
         all_telem: list[pd.DataFrame] = []
         all_labels: list[pd.DataFrame] = []
 
@@ -82,8 +87,19 @@ class TelemetryGenerator:
                     )
 
             ch_faults = [f for f in self.cfg.fault_injections if f.channel_id == ch.channel_id]
+
+            # Downsample power states to this channel's rate (list, not numpy array)
+            if interval_ms == finest_ms:
+                power_states = power_states_fine[:n_samples]
+            else:
+                step = max(int(interval_ms / finest_ms), 1)
+                power_states = power_states_fine[::step][:n_samples]
+                # Pad with last state if rounding left us short
+                while len(power_states) < n_samples:
+                    power_states = power_states + [power_states[-1]]
+
             ch_df, label_df = self._generate_channel(
-                timestamps, ch, ch_faults, bus_voltage, interval_s
+                timestamps, ch, ch_faults, bus_voltage, power_states, interval_s
             )
             all_telem.append(ch_df)
             all_labels.append(label_df)
@@ -111,6 +127,27 @@ class TelemetryGenerator:
     # ------------------------------------------------------------------
     # Bus voltage generation (shared across channels)
     # ------------------------------------------------------------------
+
+    def _build_power_state_array(self, n: int, interval_s: float) -> list[PowerState]:
+        """Return a list of PowerState values, one per sample.
+
+        Uses a Python list (not numpy) so str-Enum instances are preserved
+        exactly — numpy object arrays coerce str subclasses to plain str in
+        Python ≥ 3.11, breaking enum equality comparisons.
+
+        If no power_state_events are configured, every sample is ACTIVE.
+        Events are applied in time order; the state before the first event
+        defaults to ACTIVE.
+        """
+        states: list[PowerState] = [PowerState.ACTIVE] * n
+        events = sorted(self.cfg.power_state_events, key=lambda e: e.time_s)
+        for i, event in enumerate(events):
+            start_idx = max(0, min(int(event.time_s / interval_s), n))
+            end_idx = int(events[i + 1].time_s / interval_s) if i + 1 < len(events) else n
+            end_idx = max(start_idx, min(end_idx, n))
+            for j in range(start_idx, end_idx):
+                states[j] = event.state
+        return states
 
     def _apply_die_thermal_coupling(self, telem_df: pd.DataFrame) -> pd.DataFrame:
         """Inject cross-channel die heat into co-located channels.
@@ -208,8 +245,12 @@ class TelemetryGenerator:
             freqs[0] = 1.0  # avoid div/0 at DC
             fft *= 1.0 / (freqs ** (ch.pink_noise_alpha / 2))
             pink = np.fft.irfft(fft, n=n)
-            # Normalize to ~0.1A std
-            pink *= 0.1 / (np.std(pink) + 1e-12)
+            # Normalize to ~0.1A std — guard against n=1 where std is always 0
+            std = np.std(pink)
+            if std > 1e-10:
+                pink *= 0.1 / std
+            else:
+                pink[:] = 0.0  # single-sample window: skip pink noise
             noise += pink
 
         # ADC quantization noise (current-sense ADC)
@@ -482,6 +523,7 @@ class TelemetryGenerator:
         ch: ChannelMeta,
         faults: list[FaultInjection],
         bus_voltage: np.ndarray,
+        power_states: list[PowerState],
         interval_s: float,
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         n = len(timestamps)
@@ -506,6 +548,60 @@ class TelemetryGenerator:
         status = np.full(n, DeviceStatus.OK.value, dtype=object)
         fault_active = np.full(n, FaultType.NONE.value, dtype=object)
         severity = np.zeros(n)
+
+        # --- Apply power-state gating ---
+        # Determine for each sample whether this channel is powered based on its
+        # power_class and the scenario's power_state_events.
+        #
+        # Power-class × state mapping:
+        #   ALWAYS_ON  (KL30)  → ON in all states; SLEEP = quiescent dark current
+        #   IGNITION   (KL15)  → ON only in ACTIVE; off in SLEEP/ACCESSORY/CRANK
+        #   ACCESSORY  (KLR)   → ON in ACTIVE + ACCESSORY; off in SLEEP/CRANK
+        #   START      (KL50)  → ON only in CRANK; off everywhere else
+        quiescent_a = ch.sleep_quiescent_ua * 1e-6  # µA → A
+        prev_state: PowerState | None = None
+        for i in range(n):
+            ps: PowerState = power_states[i]
+
+            # Determine if this channel is powered in this state
+            if ch.power_class == PowerClass.ALWAYS_ON:
+                powered = True
+            elif ch.power_class == PowerClass.IGNITION:
+                powered = ps == PowerState.ACTIVE
+            elif ch.power_class == PowerClass.ACCESSORY:
+                powered = ps in (PowerState.ACTIVE, PowerState.ACCESSORY)
+            elif ch.power_class == PowerClass.START:
+                powered = ps == PowerState.CRANK
+            else:
+                powered = True
+
+            if not powered:
+                # Gate off: near-zero leakage for all non-powered channels
+                current[i] = self.rng.normal(0.00005, 0.00002)  # < 0.1 mA
+                state[i] = False
+                status[i] = DeviceStatus.OK.value  # off intentionally — not a fault
+
+            else:
+                # ALWAYS_ON in SLEEP: draw quiescent dark current (KL30 stays on but at standby level)
+                if ch.power_class == PowerClass.ALWAYS_ON and ps == PowerState.SLEEP:
+                    current[i] = quiescent_a + self.rng.normal(0, quiescent_a * 0.1)
+                # Wake transition: apply inrush on first powered sample after unpowered
+                if prev_state is not None and not (
+                    (ch.power_class == PowerClass.ALWAYS_ON)
+                    or (ch.power_class == PowerClass.IGNITION and prev_state == PowerState.ACTIVE)
+                    or (ch.power_class == PowerClass.ACCESSORY and prev_state in (PowerState.ACTIVE, PowerState.ACCESSORY))
+                    or (ch.power_class == PowerClass.START and prev_state == PowerState.CRANK)
+                ):
+                    # Came from an unpowered state — inject wake inrush window
+                    inrush_samples = max(int(ch.wake_inrush_duration_ms / 1000 / interval_s), 1)
+                    end_inrush = min(i + inrush_samples, n)
+                    t_ramp = np.linspace(ch.wake_inrush_factor, 1.0, end_inrush - i)
+                    current[i:end_inrush] = (
+                        ch.nominal_current_a * t_ramp
+                        + self._composite_noise(end_inrush - i, ch)
+                    )
+
+            prev_state = ps
 
         # --- Apply fault injections with realistic waveforms ---
         for fi in faults:

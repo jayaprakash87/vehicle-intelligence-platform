@@ -74,6 +74,7 @@ class FaultType(str, Enum):
     COLD_CRANK = "cold_crank"  # Cold-crank battery sag: bus 7–9 V / 3–5 s
     CONNECTOR_AGING = "connector_aging"  # Fretting/oxidation raises harness contact resistance
     THERMAL_COUPLING = "thermal_coupling"  # Elevated temp from co-die neighbour channel(s)
+    WAKE_TRANSIENT = "wake_transient"  # Abnormal current surge on KL15/KLR wake-up
 
 
 class SourceProtocol(str, Enum):
@@ -121,6 +122,21 @@ class EFuseFamily(str, Enum):
 
     # Custom / ASIC — user-defined eFuse with user-provided parameters
     CUSTOM = "custom"
+
+class PowerState(str, Enum):
+    """Vehicle power state — determines which power rails are energised.
+
+    Maps to KL line terminology used by AUTOSAR and OEM electrical specs:
+      SLEEP    KL30 live, KL15 off — vehicle parked, ECU in low-power mode
+      ACTIVE   KL30 + KL15 live — normal ignition-on operation
+      ACCESSORY KL30 + KLR live, KL15 off — radio / windows after key-off
+      CRANK    KL30 + KL50 live — starter motor engaged, KL15 may dip
+    """
+
+    SLEEP = "sleep"        # KL30 only — most channels OFF
+    ACTIVE = "active"      # KL15 on  — normal run
+    ACCESSORY = "accessory"  # KLR on   — post key-off accessory rail
+    CRANK = "crank"        # KL50 on  — engine cranking
 
 
 class SafetyLevel(str, Enum):
@@ -533,6 +549,27 @@ class ChannelMeta(BaseModel):
     thermal_coupling_coeff: float = Field(
         default=0.15,
         description="Fraction of each co-die channel's steady-state ΔT injected into this channel (typ. 0.10–0.25)",
+    )
+
+    # --- Sleep / wake behaviour ---
+    # During SLEEP the eFuse gate is OFF for IGNITION/ACCESSORY/START channels.
+    # ALWAYS_ON (KL30) channels remain gated ON but draw only the standby
+    # quiescent current of the load (e.g. clock, memory keep-alive).
+    # On transition to ACTIVE / ACCESSORY, IGNITION channels may exhibit a brief
+    # wake inrush (capacitive load charging, relay pull-in) before settling.
+    sleep_quiescent_ua: float = Field(
+        default=500.0,
+        description="Load quiescent current µA during SLEEP for ALWAYS_ON channels (typ. 100–5000 µA)",
+    )
+    wake_inrush_factor: float = Field(
+        default=1.0,
+        ge=1.0,
+        description="Current multiplier on first samples after SLEEP→ACTIVE wake transition (≥ 1.0)",
+    )
+    wake_inrush_duration_ms: float = Field(
+        default=50.0,
+        ge=0.0,
+        description="Duration of wake inrush in ms (typ. 20–200 ms for capacitive/relay loads)",
     )
 
 
