@@ -123,12 +123,12 @@ class NormalizerConfig(BaseModel):
 
 ```python
 class EdgeConfig(BaseModel):
-    batch_size: int = 50
+    batch_size: int = 50  # rows pulled from transport per loop iteration
     alert_anomaly_threshold: float = 0.6
-    flush_interval: int = 20
+    flush_interval: int = 20  # flush scored data every N loop iterations
     max_consecutive_errors: int = 5
     alert_cooldown_s: float = 10.0
-    heartbeat_interval: int = 5
+    heartbeat_interval: int = 5  # write heartbeat every N loop iterations
     disk_min_free_mb: int = 100
     model_hot_reload: bool = True
 ```

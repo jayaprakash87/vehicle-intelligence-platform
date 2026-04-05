@@ -106,12 +106,12 @@ class StorageConfig(BaseModel):
 
 
 class EdgeConfig(BaseModel):
-    batch_size: int = 50
-    alert_anomaly_threshold: float = 0.6
-    flush_interval: int = 20  # flush scored data to disk every N batches
+    batch_size: int = 50  # rows pulled from transport per loop iteration
+    alert_anomaly_threshold: float = 0.6  # minimum score required before emitting an alert
+    flush_interval: int = 20  # flush scored data to disk every N loop iterations
     max_consecutive_errors: int = 5  # crash after N consecutive loop errors
     alert_cooldown_s: float = 10.0  # suppress duplicate channel+fault alerts within window
-    heartbeat_interval: int = 5  # write heartbeat file every N iterations
+    heartbeat_interval: int = 5  # write heartbeat file every N loop iterations
     disk_min_free_mb: int = 100  # warn + skip writes below this threshold
     model_hot_reload: bool = True  # watch model file mtime and reload on change
 

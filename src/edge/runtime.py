@@ -112,6 +112,11 @@ class EdgeRuntime:
         cfg = self.cfg
         if cfg.batch_size < 1:
             raise ValueError(f"batch_size must be >= 1, got {cfg.batch_size}")
+        if not 0 <= cfg.alert_anomaly_threshold <= 1:
+            raise ValueError(
+                "alert_anomaly_threshold must be between 0 and 1, "
+                f"got {cfg.alert_anomaly_threshold}"
+            )
         if cfg.flush_interval < 1:
             raise ValueError(f"flush_interval must be >= 1, got {cfg.flush_interval}")
         if cfg.max_consecutive_errors < 1:
@@ -290,9 +295,18 @@ class EdgeRuntime:
                     if self._flush_counter >= self.cfg.flush_interval:
                         self._flush_scored()
 
-                    # Emit alerts for anomalies (with rate-limiting)
+                    # Emit alerts only for anomalous rows above the configured threshold.
                     iter_alerts = 0
-                    anomalies = scored[scored.get("is_anomaly", pd.Series(dtype=bool))]
+                    anomaly_mask = scored.get(
+                        "is_anomaly", pd.Series(False, index=scored.index, dtype=bool)
+                    )
+                    score_series = scored.get(
+                        "anomaly_score", pd.Series(0.0, index=scored.index, dtype=float)
+                    )
+                    anomalies = scored[
+                        anomaly_mask.fillna(False).astype(bool)
+                        & (score_series.fillna(0.0) >= self.cfg.alert_anomaly_threshold)
+                    ]
                     for _, row in anomalies.iterrows():
                         alert = self._make_alert(row)
                         if self._should_emit_alert(alert["channel_id"], alert["fault"]):

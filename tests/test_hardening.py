@@ -66,6 +66,12 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="batch_size"):
             rt.run()
 
+    def test_invalid_alert_threshold_rejected(self):
+        df = _make_telemetry(10)
+        rt, _ = _runtime(df, alert_anomaly_threshold=1.5)
+        with pytest.raises(ValueError, match="alert_anomaly_threshold"):
+            rt.run()
+
     def test_negative_cooldown_rejected(self):
         df = _make_telemetry(10)
         rt, _ = _runtime(df, alert_cooldown_s=-1)
@@ -159,6 +165,27 @@ class TestHealthMetrics:
 
 
 class TestAlertRateLimiting:
+    def test_alert_threshold_filters_low_score_rows(self):
+        df = _make_telemetry(100)
+        rt, _ = _runtime(df, alert_anomaly_threshold=0.95)
+
+        scored = pd.DataFrame(
+            {
+                "timestamp": df["timestamp"].iloc[:2],
+                "channel_id": ["ch_01", "ch_01"],
+                "anomaly_score": [0.80, 0.99],
+                "is_anomaly": [True, True],
+                "predicted_fault": ["overload_spike", "overload_spike"],
+                "fault_confidence": [0.8, 0.9],
+                "likely_causes": [["x"], ["y"]],
+            }
+        )
+
+        rt.pipeline.run_streaming = MagicMock(return_value=scored)
+        alerts = rt.run(max_iterations=1)
+        assert len(alerts) == 1
+        assert alerts[0]["score"] == 0.99
+
     def test_duplicate_alerts_suppressed(self):
         """Same channel+fault within cooldown window should be suppressed."""
         df = _make_telemetry(200)

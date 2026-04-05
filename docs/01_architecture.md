@@ -96,6 +96,8 @@ sequenceDiagram
 
 Used for incremental inference. The `EdgeRuntime` maintains a rolling buffer, scores each mini-batch in context, and emits alerts for anomalies. Hardened with alert rate-limiting, heartbeat monitoring, model hot-reload, signal handling, and disk space protection.
 
+Current implementation note: edge inference is driven by incoming row batches from the transport, not by a fixed 60-second timer. In the current codebase, the implemented layer is the fast streaming detector. Cycle-level analytics (drive / charge / ignition-cycle summaries) and lifetime health tracking are recommended production extensions, not features that already exist in the runtime today.
+
 ```mermaid
 sequenceDiagram
     participant Transport
@@ -104,17 +106,23 @@ sequenceDiagram
     participant Storage
 
     loop Until transport exhausted or SIGTERM
-        Transport->>EdgeRuntime: batch(50 rows)
+        Transport->>EdgeRuntime: batch(50 rows from transport)
         EdgeRuntime->>EdgeRuntime: Append to rolling buffer
         EdgeRuntime->>InferencePipeline: run_streaming(buffer, new_batch)
         InferencePipeline-->>EdgeRuntime: scored_batch
         EdgeRuntime->>EdgeRuntime: Throttle alerts (cooldown per channel+fault)
-        EdgeRuntime->>EdgeRuntime: Write heartbeat every N iterations
+        EdgeRuntime->>EdgeRuntime: Write heartbeat every N loop iterations
         EdgeRuntime->>EdgeRuntime: Check model hot-reload (mtime)
     end
     EdgeRuntime->>Storage: write_scored(all_accumulated)
     EdgeRuntime->>Storage: write_alerts(all_alerts)
 ```
+
+    Recommended production layering:
+
+    1. Fast streaming layer: short rolling-window detection for overload spikes, voltage sag, protection trips, and thermal excursions.
+    2. Cycle layer: per-drive / per-charge / per-ignition summaries for repeated stress, nuisance trips, and operating-context scoring.
+    3. Lifetime layer: long-horizon degradation tracking for aging, drift, and service diagnostics.
 
 ## Module Dependency Graph
 
@@ -155,7 +163,7 @@ graph TD
 
 ## Vehicle Topology
 
-### eFuse IC Catalog — 9 Families
+### eFuse IC Catalog — 17 Families
 
 Each family defines electrical and thermal defaults used by the simulator.
 

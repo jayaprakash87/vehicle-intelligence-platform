@@ -15,7 +15,11 @@ simulation:
   scenario_id: example_full_vehicle
   name: "Example Full Vehicle — 65 Channels"
   description: "Generic 4-zone BEV/premium topology with 65 eFuse channels"
+  # Simulation horizon for offline generation and demos.
+  # This is not the cadence of edge inference.
   duration_s: 60.0
+  # Default telemetry sample interval used by the simulator.
+  # The edge runtime still scores as new batches arrive from transport.
   sample_interval_ms: 100.0
   seed: 42
   use_example_topology: true
