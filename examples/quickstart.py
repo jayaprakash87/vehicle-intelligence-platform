@@ -10,6 +10,7 @@ This script demonstrates:
   3. Generating synthetic telemetry with physics models
   4. Normalizing, extracting features, training, and running inference
   5. Evaluating detection quality
+  6. Running cycle accumulation and lifetime health tracking
 """
 
 from pathlib import Path
@@ -121,6 +122,45 @@ for ch_id, grp in scored_df.groupby("channel_id"):
     top_fault = top.mode().iloc[0] if len(top) > 0 else "none"
     print(f"  {ch_id:12s}  rows={n:4d}  anomalies={anom:3d}  top_fault={top_fault}")
 print("╰───────────────────────────╯")
+
+# ── 11. Cycle accumulation ──────────────────────────────────────────────────
+
+from src.edge.cycle import CycleAccumulator
+
+accumulator = CycleAccumulator(cycle_type="ignition")
+# Feed scored data — boundary detection auto-opens/closes on state_on_off
+summaries = accumulator.ingest(scored_df)
+# Force-close any cycle still open at end of data
+final = accumulator.close()
+if final:
+    summaries.append(final)
+
+print(f"\nCycle tracking: {len(summaries)} cycle(s) detected")
+for s in summaries:
+    print(
+        f"  {s.cycle_id}  stress={s.cycle_stress:.3f}  band={s.health_band.value:8s}"
+        f"  anomalies={s.anomaly_count}  trips={s.trip_count}"
+        f"  peak_I={s.peak_current_a:.1f}A  peak_T={s.peak_temperature_c:.1f}°C"
+    )
+
+# ── 12. Lifetime health tracking ───────────────────────────────────────────
+
+from src.edge.lifetime import LifetimeHealthTracker
+
+tracker = LifetimeHealthTracker(upper_bins=2, trend_window=5)
+# Feed all completed cycle summaries into lifetime tracker
+for s in summaries:
+    state = tracker.ingest(s)
+
+print(f"\nLifetime health: score={state.health_score:.3f}, band={state.health_band.value}, trend={state.trend.value}")
+print(f"  cycles tracked: {state.cycles_ingested}")
+print("  Load spectra (counts per bin):")
+print(f"    peak_current:      {state.peak_current_hist.counts}")
+print(f"    peak_temperature:  {state.peak_temperature_hist.counts}")
+print(f"    cycle_stress:      {state.cycle_stress_hist.counts}")
+print(f"    trips_per_cycle:   {state.trips_per_cycle_hist.counts}")
+print(f"    retries_per_cycle: {state.retries_per_cycle_hist.counts}")
+print(f"    thermal_dwell:     {state.thermal_dwell_frac_hist.counts}")
 
 print("\nDone! View results in the dashboard:")
 print("  vip dashboard --data output/quickstart/")

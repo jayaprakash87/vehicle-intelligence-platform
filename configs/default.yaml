@@ -81,3 +81,5 @@ storage:
 edge:
   batch_size: 50
   alert_anomaly_threshold: 0.6
+  cycle_tracking_enabled: true
+  lifetime_tracking_enabled: true
