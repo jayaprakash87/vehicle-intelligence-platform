@@ -118,11 +118,11 @@ sequenceDiagram
     EdgeRuntime->>Storage: write_alerts(all_alerts)
 ```
 
-    Recommended production layering:
+Recommended production layering:
 
-    1. Fast streaming layer: short rolling-window detection for overload spikes, voltage sag, protection trips, and thermal excursions.
-    2. Cycle layer: per-drive / per-charge / per-ignition summaries for repeated stress, nuisance trips, and operating-context scoring.
-    3. Lifetime layer: long-horizon degradation tracking for aging, drift, and service diagnostics.
+1. Fast streaming layer: short rolling-window detection for overload spikes, voltage sag, protection trips, and thermal excursions.
+2. Cycle layer: per-drive / per-charge / per-ignition summaries for repeated stress, nuisance trips, and operating-context scoring.
+3. Lifetime layer: long-horizon degradation tracking for aging, drift, and service diagnostics.
 
 ## Module Dependency Graph
 

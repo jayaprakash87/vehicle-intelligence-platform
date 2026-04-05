@@ -116,7 +116,8 @@ docs/                         # Architecture, implementation plan, design decisi
 ## Documentation
 
 - [Architecture](docs/01_architecture.md) — system design, data flow, module graph, schemas, vehicle topology
-- [Implementation Plan](docs/02_implementation_plan.md) — build phases, module interfaces, test inventory
+- [Developer Reference](docs/02_implementation_plan.md) — interface contracts, CLI commands, config scenarios
 - [Design Decisions](docs/03_design_decisions.md) — ADRs with rationale and trade-offs
-- [Product Strategy](docs/04_product_strategy.md) — vision, market positioning, go-to-market, roadmap
+- [Product & Positioning](docs/04_product_strategy.md) — what VIP is, market, go-to-market, roadmap
+- [Cycle & Lifetime Health Plan](docs/06_cycle_and_lifetime_health_plan.md) — next engineering work
 - [Changelog](CHANGELOG.md) — release history

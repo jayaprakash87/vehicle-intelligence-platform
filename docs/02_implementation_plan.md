@@ -1,88 +1,20 @@
-# Implementation Plan
+# Developer Reference
 
-This document defines the build order, exit criteria, and interface contracts between modules. For system architecture and data flow diagrams, see [01_architecture.md](01_architecture.md).
+Interface contracts, CLI commands, and config scenarios for the implemented streaming layer. For system architecture, see [01_architecture.md](01_architecture.md). For the next engineering work (cycle and lifetime health), see [06_cycle_and_lifetime_health_plan.md](06_cycle_and_lifetime_health_plan.md).
 
 ---
 
-## Build Phases
+## What Is Built
 
-### Phase 1 — Foundation (schemas + config + simulation)
+The streaming fault-intelligence pipeline is complete. 248 tests pass.
 
-Build the data contract and synthetic data generator. Nothing downstream can be developed or tested without data.
-
-| File | Responsibility |
-|------|----------------|
-| `src/schemas/telemetry.py` | Pydantic models: TelemetryRecord, ChannelMeta, EFuseFamily, SourceProtocol, FaultType, InferenceResult |
-| `src/config/models.py` | Typed config hierarchy + YAML loader |
-| `src/config/catalog.py` | eFuse IC catalog (9 families), vehicle topology factory, channel builder |
-| `src/simulation/generator.py` | Per-channel physics-based synthesis: RC thermal, inrush transients, composite noise, protection sim |
-| `src/utils/logging.py` | Structured logging: JSON + pretty formatters, correlation IDs |
-| `configs/default.yaml` | Mixed-fault demo (3 channels, 4 faults) |
-| `configs/nominal.yaml` | Clean baseline |
-| `configs/stress_test.yaml` | All 7 faults on 1 channel |
-| `configs/example_65ch.yaml` | Full 4-zone, 65-channel example topology |
-| `configs/xcp_test_bench.yaml` | XCP dual-raster (10ms + 50ms) |
-| `configs/production_can.yaml` | Production CAN bus rates (50–100ms) |
-
-**Exit criteria:** `TelemetryGenerator.generate()` returns well-shaped DataFrames with physics-realistic signals. Fault windows are visible in raw data. Topology configs expand correctly to 65 channels. YAML configs load without error.
-
-### Phase 2 — Signal Processing (ingestion + features)
-
-Raw data → cleaned → enriched with rolling features.
-
-| File | Responsibility |
-|------|----------------|
-| `src/ingestion/normalizer.py` | Multi-rate resampling, missing-rate tracking → time-based forward-fill → clip → type coercion |
-| `src/features/engine.py` | Rolling window feature computation (10 derived columns) with time-based window resolution |
-
-**Exit criteria:** Feature columns are present and physically plausible — RMS ≥ 0, spike_score ≥ 0, temperature_slope changes sign around thermal fault windows. Multi-rate data resampled correctly to common grid.
-
-### Phase 3 — Intelligence (models + inference)
-
-Train anomaly detector, build rules classifier, orchestrate scoring.
-
-| File | Responsibility |
-|------|----------------|
-| `src/models/anomaly.py` | IsolationForest wrapper + threshold-based fault classifier (7 fault types) |
-| `src/inference/pipeline.py` | Features → anomaly score → fault classification → InferenceResult |
-
-**Exit criteria:** Batch scoring detects anomalies in fault-injected windows. Rules classifier returns correct fault types for known patterns. Model saves and reloads successfully.
-
-### Phase 4 — Runtime (transport + edge + storage + CLI)
-
-Wire into a runnable system with persistence and both operating modes.
-
-| File | Responsibility |
-|------|----------------|
-| `src/transport/mock_can.py` | TransportBase ABC + DataFrameTransport, XcpTransport, CanTransport, ReplayTransport |
-| `src/edge/runtime.py` | Hardened loop: alert cooldown, heartbeat, model hot-reload, signal handling, error resilience, disk protection |
-| `src/storage/writer.py` | Parquet/CSV/JSON output + alert persistence |
-| `src/cli.py` | 5 Typer commands with error handling, run-ID output isolation, structured logging |
-
-**Exit criteria:** `python -m src.cli pipeline` runs end-to-end, writes to timestamped run-ID directory. `edge` command streams with alert throttling and heartbeat. CLI gives clean errors for missing files and bad configs.
-
-### Phase 5 — Validation (tests)
-
-| File | Covers |
-|------|--------|
-| `tests/test_schemas.py` | Model construction, defaults, validation, serialization |
-| `tests/test_simulation.py` | Output shape, fault presence, seed reproducibility, multi-channel |
-| `tests/test_features.py` | Feature columns present, values plausible |
-| `tests/test_models.py` | Train/score/save/load, known-fault classification |
-| `tests/test_pipeline.py` | Full integration: simulate → normalize → features → train → infer |
-| `tests/test_normalizer.py` | Sort, ffill limits, missing-rate, clipping, boolean coercion |
-| `tests/test_fault_classifier.py` | Rules classifier accuracy per fault type |
-| `tests/test_edge.py` | EdgeRuntime loop, alert emission, graceful shutdown |
-| `tests/test_edge_cases.py` | Boundary conditions, error paths |
-| `tests/test_hardening.py` | Signal handling, error resilience, heartbeat, metrics |
-| `tests/test_multi_rate.py` | Multi-rate resampling, per-channel intervals, XCP dual-raster |
-| `tests/test_topology.py` | eFuse catalog, example topology, channel factory, fleet-scale generation |
-| `tests/test_cli.py` | CLI commands, error handling, run-ID isolation |
-| `tests/test_logging.py` | JSON / pretty formats, correlation IDs, idempotent config |
-| `tests/test_storage.py` | Parquet/CSV/JSON round-trip, alert persistence |
-| `tests/test_transport.py` | XcpTransport, CanTransport, ReplayTransport, stream/batch |
-
-**Exit criteria:** 152 tests pass. Integration test detects injected faults. All hardening features exercised.
+| Layer | What | Key files |
+|-------|------|-----------|
+| Foundation | Schemas, config, eFuse catalog (17 families), 6 YAML configs | `src/schemas/`, `src/config/` |
+| Simulation | Physics-based telemetry generation | `src/simulation/generator.py` |
+| Signal Processing | Multi-rate normalizer, 10 rolling features | `src/ingestion/`, `src/features/` |
+| Intelligence | Isolation Forest + rules-based fault classifier (7 types) | `src/models/`, `src/inference/` |
+| Runtime | CAN/XCP/Replay transport, hardened edge loop, storage, CLI | `src/transport/`, `src/edge/`, `src/storage/`, `src/cli.py` |
 
 ---
 

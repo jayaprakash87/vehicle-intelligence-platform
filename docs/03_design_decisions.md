@@ -1,6 +1,6 @@
 # Design Decision Log
 
-Architecture Decision Records (ADRs) for choices that shaped the system. For system structure, see [01_architecture.md](01_architecture.md). For build phases and interfaces, see [02_implementation_plan.md](02_implementation_plan.md).
+Architecture Decision Records (ADRs) for choices that shaped the system. For system structure, see [01_architecture.md](01_architecture.md). For interface contracts and CLI reference, see [02_implementation_plan.md](02_implementation_plan.md).
 
 ---
 
