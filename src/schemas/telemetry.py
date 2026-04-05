@@ -55,6 +55,7 @@ class ProtectionEvent(str, Enum):
     I2T = "i2t"  # I²t / F(i,t) energy-integral overcurrent trip
     THERMAL_SHUTDOWN = "thermal_shutdown"  # Junction temperature exceeded limit
     LATCH_OFF = "latch_off"  # Max retries exhausted — channel locked off
+    OPEN_LOAD_DIAG = "open_load_diag"  # Open-load confirmed by IC DIAGNOSIS cycle
 
 
 class FaultType(str, Enum):
@@ -66,6 +67,7 @@ class FaultType(str, Enum):
     NOISY_SENSOR = "noisy_sensor"
     DROPPED_PACKET = "dropped_packet"
     GRADUAL_DEGRADATION = "gradual_degradation"
+    OPEN_LOAD = "open_load"  # Wire break / terminal corrosion — I≈0 while commanded ON
 
 
 class SourceProtocol(str, Enum):
@@ -234,6 +236,20 @@ class EFuseProfile(BaseModel):
     r_ilis_tolerance: float = Field(
         default=0.20,
         description="R_ILIS manufacturing tolerance fraction ± (e.g. 0.20 = ±20 %)",
+    )
+
+    # --- Open-load detection (DIAGNOSIS cycle) ---
+    # PROFET+2 / VIPower ICs run a brief DIAGNOSIS cycle to detect wire breaks.
+    # The IC monitors the IS sense current while the channel is ON.  If the
+    # sensed current stays below the OL threshold for the blank time, a status
+    # bit is set in the SPI register and the CDD reports OPEN_LOAD_DIAG.
+    ol_blank_time_ms: float = Field(
+        default=100.0,
+        description="Open-load diagnosis blank time ms — delay before OL flag is set after turn-on",
+    )
+    ol_threshold_a: float = Field(
+        default=0.0,
+        description="Open-load detection threshold A (0 = auto: 3 % of nominal_current_a)",
     )
 
     # --- Safety classification ---
@@ -452,6 +468,16 @@ class ChannelMeta(BaseModel):
     r_ilis_tolerance: float = Field(
         default=0.20,
         description="R_ILIS manufacturing tolerance fraction ±",
+    )
+
+    # --- Open-load detection ---
+    ol_blank_time_ms: float = Field(
+        default=100.0,
+        description="OL diagnosis blank time ms (delay from turn-on before IC sets OL flag)",
+    )
+    ol_threshold_a: float = Field(
+        default=0.0,
+        description="OL detection threshold A (0 = auto: 3 % of nominal_current_a)",
     )
 
 

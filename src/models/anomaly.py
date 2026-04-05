@@ -182,10 +182,30 @@ class RulesFaultClassifier:
         i2t_count = r.get("i2t_count", 0) or 0
         latch_off_count = r.get("latch_off_count", 0) or 0
         thermal_shutdown_count = r.get("thermal_shutdown_count", 0) or 0
+        ol_diag_count = r.get("open_load_diag_count", 0) or 0
 
         causes: list[str] = []
 
-        # --- Latch-off: max retries exhausted, channel locked ---
+        # --- Open load: IC DIAGNOSIS confirmed wire break / terminal open ---
+        # Detect: (a) explicit DIAGNOSIS event in protection_event, or
+        #         (b) channel commanded ON but rolling mean current is negligible.
+        state_on = r.get("state_on_off", True)
+        mean_i = r.get("rolling_mean_current", None)
+        if (
+            pe == ProtectionEvent.OPEN_LOAD_DIAG.value
+            or ol_diag_count > 0
+            or (
+                state_on
+                and mean_i is not None
+                and not (mean_i != mean_i)  # not NaN
+                and mean_i < 0.05  # < 50 mA while ON — wire break signature
+            )
+        ):
+            causes.append("Channel commanded ON but current is near-zero — open-load / wire break")
+            if ol_diag_count > 0:
+                causes.append("IC DIAGNOSIS cycle confirmed open-load status bit set")
+            return FaultType.OPEN_LOAD, min(0.7 + ol_diag_count * 0.1, 1.0), causes
+
         if pe == ProtectionEvent.LATCH_OFF.value or latch_off_count > 0:
             causes.append("eFuse exhausted max auto-retry attempts — channel latched off")
             if scp_count > i2t_count:

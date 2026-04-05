@@ -101,6 +101,7 @@ class FeatureEngine:
                 ProtectionEvent.I2T,
                 ProtectionEvent.LATCH_OFF,
                 ProtectionEvent.THERMAL_SHUTDOWN,
+                ProtectionEvent.OPEN_LOAD_DIAG,
             ):
                 col_name = f"{event.value}_count"
                 df[col_name] = df.groupby("channel_id")["protection_event"].transform(

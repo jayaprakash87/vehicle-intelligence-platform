@@ -508,6 +508,25 @@ class TelemetryGenerator:
                     pwm[sl] = np.clip(100 - np.linspace(0, 30 * fi.intensity, n_fault), 0, 100)
                     status[sl] = DeviceStatus.WARNING.value
 
+                case FaultType.OPEN_LOAD:
+                    # Wire break / terminal corrosion — channel commanded ON but load is open.
+                    # Current drops to near-zero leakage (< 1 mA, mostly noise).
+                    # State remains True (CDD keeps the gate driven) — the IC cannot
+                    # distinguish open-load from a very low-current load without DIAGNOSIS.
+                    # After ol_blank_time_ms, the IC's DIAGNOSIS cycle confirms open load
+                    # and sets the OPEN_LOAD_DIAG status bit in the SPI register.
+                    ol_threshold = ch.ol_threshold_a if ch.ol_threshold_a > 0 else ch.nominal_current_a * 0.03
+                    current[sl] = self.rng.normal(0.0005, 0.0002, n_fault)
+                    # State stays ON (gate commanded) — IC cannot self-detect without DIAGNOSIS
+                    state[sl] = True
+                    # Leakage stays well below threshold — leave trip/overload clear
+                    status[sl] = DeviceStatus.WARNING.value
+                    # DIAGNOSIS blank time: OL flag appears after ol_blank_time_ms
+                    blank_samples = max(int(ch.ol_blank_time_ms / 1000 / interval_s), 1)
+                    diag_start = start_idx + blank_samples
+                    if diag_start < end_idx:
+                        protection_event[diag_start:end_idx] = ProtectionEvent.OPEN_LOAD_DIAG.value
+
             fault_active[sl] = fi.fault_type.value
             severity[sl] = fi.intensity
 

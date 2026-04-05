@@ -419,6 +419,8 @@ def build_channels(
             "k_ilis_tempco_ppm_c": profile.k_ilis_tempco_ppm_c,
             "r_ilis_ohm": profile.r_ilis_ohm,
             "r_ilis_tolerance": profile.r_ilis_tolerance,
+            "ol_blank_time_ms": profile.ol_blank_time_ms,
+            "ol_threshold_a": profile.ol_threshold_a,
         }
 
         # Inherit from zone controller if assigned

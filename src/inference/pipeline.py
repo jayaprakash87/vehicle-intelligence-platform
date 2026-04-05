@@ -106,5 +106,6 @@ def _recommend_action(fault: FaultType, score: float) -> str:
         FaultType.NOISY_SENSOR: "Inspect sensor wiring for EMI; check ADC calibration",
         FaultType.DROPPED_PACKET: "Check CAN bus termination and wiring integrity",
         FaultType.GRADUAL_DEGRADATION: "Schedule preventive maintenance; trend indicates aging load",
+        FaultType.OPEN_LOAD: "Inspect wiring harness and connectors for break or corrosion; check terminal crimp integrity",
     }
     return actions.get(fault, "Investigate further")
