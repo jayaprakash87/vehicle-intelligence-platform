@@ -96,13 +96,15 @@ sequenceDiagram
 
 Used for incremental inference. The `EdgeRuntime` maintains a rolling buffer, scores each mini-batch in context, and emits alerts for anomalies. Hardened with alert rate-limiting, heartbeat monitoring, model hot-reload, signal handling, and disk space protection.
 
-Current implementation note: edge inference is driven by incoming row batches from the transport, not by a fixed 60-second timer. In the current codebase, the implemented layer is the fast streaming detector. Cycle-level analytics (drive / charge / ignition-cycle summaries) and lifetime health tracking are recommended production extensions, not features that already exist in the runtime today.
+Edge inference is driven by incoming row batches from the transport, not by a fixed 60-second timer. All three processing layers are implemented and wired into the runtime loop:
 
 ```mermaid
 sequenceDiagram
     participant Transport
     participant EdgeRuntime
     participant InferencePipeline
+    participant CycleAccumulator
+    participant LifetimeHealthTracker
     participant Storage
 
     loop Until transport exhausted or SIGTERM
@@ -111,6 +113,14 @@ sequenceDiagram
         EdgeRuntime->>InferencePipeline: run_streaming(buffer, new_batch)
         InferencePipeline-->>EdgeRuntime: scored_batch
         EdgeRuntime->>EdgeRuntime: Throttle alerts (cooldown per channel+fault)
+        EdgeRuntime->>CycleAccumulator: ingest(scored_batch)
+        CycleAccumulator->>CycleAccumulator: Detect boundary, accumulate counters
+        alt Cycle closes
+            CycleAccumulator-->>EdgeRuntime: CycleSummary
+            EdgeRuntime->>LifetimeHealthTracker: ingest(summary)
+            LifetimeHealthTracker->>LifetimeHealthTracker: Record into 6 histograms, derive health
+            LifetimeHealthTracker-->>EdgeRuntime: LifetimeHealthState
+        end
         EdgeRuntime->>EdgeRuntime: Write heartbeat every N loop iterations
         EdgeRuntime->>EdgeRuntime: Check model hot-reload (mtime)
     end
@@ -118,11 +128,11 @@ sequenceDiagram
     EdgeRuntime->>Storage: write_alerts(all_alerts)
 ```
 
-Recommended production layering:
+Three processing layers (all implemented):
 
-1. Fast streaming layer: short rolling-window detection for overload spikes, voltage sag, protection trips, and thermal excursions.
-2. Cycle layer: per-drive / per-charge / per-ignition summaries for repeated stress, nuisance trips, and operating-context scoring.
-3. Lifetime layer: long-horizon degradation tracking for aging, drift, and service diagnostics.
+1. **Streaming layer:** short rolling-window detection for overload spikes, voltage sag, protection trips, and thermal excursions.
+2. **Cycle layer:** per-drive / per-charge / per-ignition summaries with stress scoring, dominant-fault identification, and health-band classification. Implemented in `CycleAccumulator`.
+3. **Lifetime layer:** histogram-based load-spectrum tracking (6 histograms × 8 bins) with weighted health derivation and trend detection. Implemented in `LifetimeHealthTracker`.
 
 ## Module Dependency Graph
 
@@ -134,6 +144,8 @@ graph TD
     SCH --> ING[ingestion/normalizer]
     SCH --> MOD[models/anomaly]
     SCH --> INF[inference/pipeline]
+    SCH --> CYC[edge/cycle]
+    SCH --> LFT[edge/lifetime]
 
     CAT --> SIM
     CFG --> SIM
@@ -141,6 +153,7 @@ graph TD
     CFG --> MOD
     CFG --> INF
     CFG --> STR[storage/writer]
+    CFG --> EDG[edge/runtime]
 
     LOG[utils/logging] --> SIM
     LOG --> ING
@@ -149,7 +162,7 @@ graph TD
     LOG --> INF
     LOG --> TRN[transport/mock_can]
     LOG --> STR
-    LOG --> EDG[edge/runtime]
+    LOG --> EDG
     LOG --> CLI[cli]
 
     FE --> INF
@@ -157,6 +170,8 @@ graph TD
     INF --> EDG
     TRN --> EDG
     STR --> EDG
+    CYC --> EDG
+    LFT --> EDG
 ```
 
 **Leaf modules** (no internal dependencies): `schemas/telemetry`, `utils/logging`.
@@ -273,6 +288,48 @@ The `FeatureConfig.resolve(sample_interval_s)` method auto-computes `window_size
 | `likely_causes` | list[str] | Human-readable explanations |
 | `recommended_action` | str | Suggested next step |
 
+### CycleSummary — Per-Cycle Health Record
+
+Produced by `CycleAccumulator` at cycle close. Held in RAM until uploaded.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cycle_id` | str | Unique UUID-based identifier |
+| `cycle_type` | str | `ignition` / `drive` / `charge` |
+| `open_timestamp` | datetime | Cycle start (UTC) |
+| `close_timestamp` | datetime | Cycle end (UTC) |
+| `duration_s` | float | Cycle length in seconds |
+| `sample_count` | int | Total scored rows in cycle |
+| `anomaly_count` | int | Rows with `is_anomaly == True` |
+| `trip_count` | int | Rows with `trip_flag == True` |
+| `retry_count` | int | Peak `reset_counter` value |
+| `peak_current_a` | float | Max current observed (A) |
+| `peak_temperature_c` | float | Max junction temp observed (°C) |
+| `high_load_dwell_s` | float | Time above high-current threshold (s) |
+| `high_temp_dwell_s` | float | Time above high-temp threshold (s) |
+| `voltage_sag_dwell_s` | float | Time below low-voltage threshold (s) |
+| `dominant_fault` | FaultType | Majority-vote fault |
+| `dominant_fault_confidence` | float | Vote fraction for top fault |
+| `cycle_stress` | float 0–1 | Weighted composite stress score |
+| `health_band` | HealthBand | NOMINAL / MONITOR / DEGRADED / CRITICAL |
+
+### LifetimeHealthState — Histogram-Based Load Spectra
+
+Maintained by `LifetimeHealthTracker`. Six fixed-bin histograms (8 bins each) updated once per cycle close.
+
+| Histogram | Unit | Edges (7) | Health Weight |
+|-----------|------|-----------|---------------|
+| `peak_current_hist` | A | 2, 5, 8, 12, 15, 20, 30 | 0.20 |
+| `peak_temperature_hist` | °C | 40, 60, 80, 100, 120, 140, 160 | 0.20 |
+| `cycle_stress_hist` | ratio | 0.05, 0.10, 0.15, 0.25, 0.40, 0.60, 0.80 | 0.20 |
+| `trips_per_cycle_hist` | count | 1, 2, 3, 5, 8, 12, 20 | 0.15 |
+| `retries_per_cycle_hist` | count | 1, 2, 3, 5, 8, 12, 20 | 0.10 |
+| `thermal_dwell_frac_hist` | ratio | 0.01, 0.05, 0.10, 0.20, 0.35, 0.50, 0.75 | 0.15 |
+
+Derived fields: `health_score` (1 − weighted upper-tail fractions), `health_band`, `trend` (IMPROVING / STABLE / DEGRADING / WORSENING), `cycle_count`.
+
+Total memory: ~402 bytes (fits a single NvM block). See [07_metrics_reference.md](07_metrics_reference.md) for full metric definitions, formulas, and bin interpretations.
+
 ## Physics-Based Signal Models
 
 ### Thermal Model — First-Order RC
@@ -368,6 +425,8 @@ JSON mode is designed for log aggregation pipelines (ELK, Datadog, etc.).
 | Simulation + training | ✅ | — |
 | Feature engine | ✅ | ✅ (smaller buffers) |
 | Inference pipeline | ✅ batch | ✅ streaming |
+| Cycle tracking | ✅ testing | ✅ target |
+| Lifetime health tracking | ✅ testing | ✅ target |
 | Edge runtime hardening | ✅ (testing) | ✅ (production) |
 | Edge runtime | ✅ testing | ✅ target |
 | Storage | ✅ parquet | ✅ parquet |

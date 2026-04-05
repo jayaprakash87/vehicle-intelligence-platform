@@ -124,18 +124,26 @@ On-vehicle persistence of cycle summaries is the ZC's responsibility, not VIP's.
 
 ### C. Compact Lifetime State
 
-Persistent scalar state, not rich history.
+Six fixed-bin histogram counters (8 bins each), updated once per cycle close.
 
-Examples:
+Histograms track:
 
-- current baseline EWMA
-- temperature baseline EWMA
-- thermal burden score
-- trip burden score
-- retry burden score
-- anomaly burden score
-- last health score
-- trend direction
+- peak current distribution
+- peak temperature distribution
+- cycle stress distribution
+- trips per cycle distribution
+- retries per cycle distribution
+- thermal dwell fraction distribution
+
+Derived from histogram shape (not stored separately):
+
+- health score (1 − weighted upper-tail fractions)
+- health band
+- trend direction (half-split comparison over recent scores)
+
+Total memory: ~402 bytes. Fits a single NvM block.
+
+See [07_metrics_reference.md](07_metrics_reference.md) for exact bin edges, weights, and formulas.
 
 ## Cycle Summary Flow
 
@@ -190,87 +198,85 @@ Keep channel-level detail only when a channel is interesting, for example:
 - strong drift from baseline
 - top-N worst channels in the cycle
 
-## How Load Spectra Should Be Used
+## How Load Spectra Are Used
 
-Load spectra are useful, but only selectively.
+Load spectra are implemented as system-level histograms on the edge device.
 
-They should not mean full histograms for every eFuse on the vehicle.
+Six histograms, each with 8 bins (7 edges):
 
-Use them for:
-
-- critical channels
-- high-duty channels
-- channels already in degraded state
-- top-N worst channels in each system
-
-Keep them coarse, for example 8 to 16 bins.
-
-Useful spectra types:
-
-- current amplitude
-- temperature dwell
+- peak current amplitude (A)
+- peak junction temperature (°C)
+- cycle stress score (ratio)
 - trip count per cycle
 - retry count per cycle
-- voltage sag depth or dwell
-- thermal swing magnitude
+- thermal dwell fraction per cycle
 
-For most channels, simple proxies are enough:
+Each bin is a simple uint32 counter — one increment per completed cycle.
 
-- EWMA current
-- EWMA temperature
-- time-over-threshold counters
-- trip and retry counts
-- decayed burden score
+Health is derived from upper-tail fractions: the proportion of total cycles that landed in the top-k bins (default k=2). A system where counts migrate from lower to upper bins sees its health score drop.
+
+This approach:
+
+- preserves distribution shape (unlike EWMA)
+- answers questions like "how many cycles had peak current above 20 A?"
+- maps naturally to Miner’s rule / Wöhler curves for fatigue analysis
+- is NvM-friendly (~192 bytes for all 48 counters)
+- matches standard automotive load-spectra practice (8-bin fixed histograms)
 
 ## How Cycle Summaries And Load Spectra Fit Together
 
 - Cycle summaries capture what happened in one session
-- Spectra represent long-term exposure for selected channels
+- Load-spectrum histograms track cumulative exposure over many cycles
 
-Recommended pattern:
+Implemented pattern:
 
-1. During a cycle, update counters and temporary exposure accumulators.
-2. At cycle close, generate one cycle summary.
-3. Update compact lifetime state.
-4. Update spectra only for tracked channels.
-5. Upload summaries to backend for richer multi-cycle analysis.
+1. During a cycle, CycleAccumulator updates RAM counters per scored row.
+2. At cycle close, one CycleSummary is generated with stress score and health band.
+3. LifetimeHealthTracker records 6 values from the summary into load-spectrum histograms.
+4. Lifetime health score, band, and trend are recomputed from histogram shape.
+5. Summaries stay in memory until upload to backend.
 
 ## Health Scoring
 
 ### Cycle Health
 
-Use a small set of stable metrics:
-
-- anomaly count
-- trip count
-- retry count
-- peak current relative to nominal
-- max temperature relative to threshold
-- high-load dwell
-- high-temperature dwell
-- dominant fault severity
-
-Conceptually:
+Computed at cycle close from accumulated counters:
 
 $$
-CycleStress = w_1 E_{anomaly} + w_2 E_{trip} + w_3 E_{retry} + w_4 B_{thermal} + w_5 B_{current}
+CycleStress = 0.35 \cdot E_{anomaly} + 0.25 \cdot E_{trip} + 0.15 \cdot E_{retry} + 0.25 \cdot B_{thermal}
 $$
 
-Then map to:
+Each component is clamped to [0, 1]. See [07_metrics_reference.md](07_metrics_reference.md) for per-component formulas.
 
-- cycle stress score
-- cycle health band
+Band mapping:
+
+| Band | Stress Range |
+|------|--------------|
+| NOMINAL | < 0.15 |
+| MONITOR | 0.15 – 0.40 |
+| DEGRADED | 0.40 – 0.70 |
+| CRITICAL | ≥ 0.70 |
 
 ### Lifetime Health
 
-Combine:
+Derived from histogram upper-tail fractions with weighted combination:
 
-- cumulative burden
-- recent trend
-- repeated protection behavior
-- deviation from baseline
+$$
+HealthScore = 1.0 - \sum_{i=1}^{6} w_i \cdot \text{upper\_fraction}_i(k)
+$$
 
-Edge-side lifetime state stays compact.
+Where $k$ is the number of top bins to consider (default 2).
+
+Weights: peak current 0.20, peak temperature 0.20, cycle stress 0.20, trips 0.15, retries 0.10, thermal dwell 0.15.
+
+| Band | Score Range |
+|------|-------------|
+| NOMINAL | > 0.85 |
+| MONITOR | 0.60 – 0.85 |
+| DEGRADED | 0.30 – 0.60 |
+| CRITICAL | ≤ 0.30 |
+
+Trend is detected by comparing the average of the first and second halves of a sliding window of recent health scores.
 
 Backend-side analytics can add:
 
@@ -317,27 +323,28 @@ Use the 28-day or buffer-full rule, but add priority override:
 
 ## MVP
 
-### On Edge
+### On Edge (Implemented)
 
-- cycle accumulator in RAM
+- cycle accumulator in RAM (CycleAccumulator)
 - in-memory cycle summary list with upload to backend
 - channel detail only for abnormal channels
-- scalar lifetime state for top-risk channels
+- histogram-based lifetime state (6 × 8-bin load spectra, ~402 bytes)
+- health score, band, and trend derived from histogram shape
 
-### In Backend
+### In Backend (Future)
 
 - cycle summary ingestion
 - lifetime score reconstruction
 - trend views
 - top-risk ranking
 
-### Minimum Outputs
+### Minimum Outputs (Implemented)
 
 - cycle stress score
 - cycle health band
 - lifetime health score
 - lifetime trend direction
-- maintenance priority
+- per-histogram distribution data
 
 ## Phased Implementation
 
@@ -347,19 +354,23 @@ Use the 28-day or buffer-full rule, but add priority override:
 - ✅ cycle-close summary generation (CycleSummary, HealthBand)
 - ✅ summaries held in RAM, available for upload
 
-### Phase 2 — Next
+### Phase 2 — Done
 
-- add compact lifetime state on edge
-- compute health score and trend from cycle summaries
+- ✅ histogram-based lifetime state on edge (6 histograms × 8 bins)
+- ✅ health score derived from upper-tail fractions
+- ✅ trend detection (half-split comparison)
+- ✅ wired into EdgeRuntime (cycle close → lifetime ingest)
 
-### Phase 3
+### Phase 3 — Next
 
-- add selective load spectra for critical or degraded channels
-- add backend lifetime reconstruction and dashboard views
+- backend cycle summary ingestion
+- backend lifetime reconstruction and dashboard views
+- selective channel-level detail for degraded channels
 
 ### Phase 4
 
-- add DTC correlation and service-facing interpretation
+- DTC correlation and service-facing interpretation
+- fleet-level comparison and percentile ranking
 
 ## Final Position
 
@@ -367,9 +378,9 @@ Do not build this as full per-eFuse lifetime history on vehicle.
 
 Build it as:
 
-- compact cycle summaries
+- compact cycle summaries (CycleSummary, ~320 bytes each)
 - exception-based channel detail
-- small persistent lifetime state on edge
+- histogram-based load spectra on edge (~402 bytes total)
 - richer lifetime analysis off vehicle
 
 That is the design most likely to survive real automotive constraints.
