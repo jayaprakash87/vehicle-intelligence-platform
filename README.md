@@ -4,7 +4,7 @@ Automotive eFuse telemetry intelligence — physics-based signal synthesis, mult
 
 ## What This Does
 
-Generates realistic eFuse telemetry from a catalog of 9 IC families across a 52-channel, 4-zone vehicle topology. Models first-order RC thermal response, load-specific inrush transients, composite noise (pink + quantization + EMI), and eFuse protection cycles (trip → cooldown → retry → latch-off). Supports CAN production rates and XCP dual-raster test-bench rates. Computes rolling signal features, scores anomalies with Isolation Forest, classifies 7 fault types with interpretable rules, and runs it all in a hardened edge loop with alert throttling, heartbeat monitoring, model hot-reload, and signal-safe shutdown. Replays real measurement data from MDF4, CSV, or Parquet files. Publishes alerts via MQTT. No OEM data or lab hardware required.
+Generates realistic eFuse telemetry from a catalog of 9 IC families across a 65-channel, 4-zone vehicle topology. Models first-order RC thermal response, PROFET+2/VIPower Rds,on temperature coefficient, ISENSE sensing-chain gain error, load-specific inrush transients, composite noise (pink + quantization + EMI), and eFuse protection cycles (trip → cooldown → retry → latch-off). Supports CAN production rates and XCP dual-raster test-bench rates. Simulates abnormal bus voltage events (jump-start, load dump, cold crank), wire harness + connector aging, multi-channel die thermal coupling, and sleep/wake power-state gating (KL30/KL15/KLR/KL50). Computes rolling signal features, scores anomalies with Isolation Forest, classifies 16 fault types with interpretable rules, and runs it all in a hardened edge loop with alert throttling, heartbeat monitoring, model hot-reload, and signal-safe shutdown. Replays real measurement data from MDF4, CSV, or Parquet files. Publishes alerts via MQTT. No OEM data or lab hardware required.
 
 ## Setup
 
@@ -69,7 +69,7 @@ vip dashboard --data output/quickstart/
 ## Tests
 
 ```bash
-pytest tests/ -v          # 246 tests across 20 test files
+pytest tests/ -v          # 330 tests across 20 test files
 ```
 
 ## Project Structure
@@ -77,11 +77,11 @@ pytest tests/ -v          # 246 tests across 20 test files
 ```
 src/
 ├── cli.py                    # Typer CLI — 8 commands (simulate, replay, train, infer, edge, pipeline, dashboard)
-├── schemas/telemetry.py      # Pydantic models: TelemetryRecord, ChannelMeta, ProtectionEvent, EFuseFamily, …
+├── schemas/telemetry.py      # Pydantic models: TelemetryRecord, ChannelMeta, ProtectionEvent, PowerState, EFuseFamily, …
 ├── config/
 │   ├── models.py             # Typed config hierarchy + YAML loader
 │   └── catalog.py            # eFuse IC catalog (9 families), vehicle topology factory, channel builder
-├── simulation/generator.py   # Physics-based telemetry: RC thermal, inrush, composite noise, protection sim
+├── simulation/generator.py   # Physics-based telemetry: RC thermal, Rds,on tempco, ISENSE chain, inrush, composite noise, protection sim, power-state gating, die thermal coupling
 ├── transport/
 │   ├── mock_can.py           # TransportBase + DataFrameTransport, XcpTransport, CanTransport, ReplayTransport
 │   └── alert_sinks.py        # AlertSinkBase + LogAlertSink + MqttAlertSink
@@ -90,7 +90,7 @@ src/
 │   └── reader.py             # MeasurementReader — MDF4/CSV/Parquet ingest with column mapping
 ├── features/engine.py        # Rolling feature computation (10+ derived signals) with time-based windows
 ├── models/
-│   ├── anomaly.py            # Isolation Forest + rules-based fault classifier (7 fault types)
+│   ├── anomaly.py            # Isolation Forest + rules-based fault classifier (16 fault types)
 │   └── evaluation.py         # Precision/recall/F1, per-fault metrics, time-to-detect
 ├── inference/pipeline.py     # Feature → score → classify orchestration (batch + streaming)
 ├── edge/runtime.py           # Hardened loop: alert cooldown, heartbeat, hot-reload, signal handling
@@ -109,7 +109,7 @@ configs/
 examples/
 └── quickstart.py             # End-to-end demo: generate → train → infer → evaluate → save
 
-tests/                        # 20 test files, 246 tests
+tests/                        # 20 test files, 330 tests
 docs/                         # Architecture, implementation plan, design decisions, product strategy
 ```
 
