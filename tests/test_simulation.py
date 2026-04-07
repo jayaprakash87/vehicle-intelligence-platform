@@ -3,7 +3,14 @@
 import pandas as pd
 
 from src.config.models import SimulationConfig
-from src.schemas.telemetry import ChannelMeta, FaultInjection, FaultType, ProtectionEvent, PowerClass, PowerState
+from src.schemas.telemetry import (
+    ChannelMeta,
+    FaultInjection,
+    FaultType,
+    ProtectionEvent,
+    PowerClass,
+    PowerState,
+)
 from src.config.models import PowerStateEvent
 from src.simulation.generator import TelemetryGenerator
 
@@ -313,6 +320,7 @@ def test_nominal_no_thermal_shutdown():
 # Gap #5 — Abnormal bus voltage scenarios
 # ---------------------------------------------------------------------------
 
+
 def _make_ch_bus(rds_on_tempco_exp: float = 0.0) -> ChannelMeta:
     """Minimal ChannelMeta for bus-voltage scenario tests (tempco off for simplicity)."""
     return ChannelMeta(
@@ -337,16 +345,23 @@ def test_jump_start_elevates_bus_voltage():
         sample_interval_ms=100.0,
         channels=[ch],
         fault_injections=[
-            FaultInjection(channel_id="ch_bus", fault_type=FaultType.JUMP_START,
-                           start_s=5.0, duration_s=10.0, intensity=0.8),
+            FaultInjection(
+                channel_id="ch_bus",
+                fault_type=FaultType.JUMP_START,
+                start_s=5.0,
+                duration_s=10.0,
+                intensity=0.8,
+            ),
         ],
     )
     gen = TelemetryGenerator(cfg)
     df, labels = gen.generate()
-    fault_rows = df[df["timestamp"].between(
-        df["timestamp"].iloc[0] + pd.Timedelta(seconds=6),
-        df["timestamp"].iloc[0] + pd.Timedelta(seconds=14),
-    )]
+    fault_rows = df[
+        df["timestamp"].between(
+            df["timestamp"].iloc[0] + pd.Timedelta(seconds=6),
+            df["timestamp"].iloc[0] + pd.Timedelta(seconds=14),
+        )
+    ]
     assert fault_rows["voltage_v"].max() > 16.0, "Jump-start should push bus above 16 V"
     ov_rows = fault_rows[fault_rows["protection_event"] == ProtectionEvent.OVER_VOLTAGE.value]
     assert len(ov_rows) > 0, "OVER_VOLTAGE protection event should be set during jump-start"
@@ -361,8 +376,13 @@ def test_jump_start_current_scales_with_voltage():
         duration_s=10.0,
         channels=[ch],
         fault_injections=[
-            FaultInjection(channel_id="ch_bus", fault_type=FaultType.JUMP_START,
-                           start_s=0.0, duration_s=10.0, intensity=0.9),
+            FaultInjection(
+                channel_id="ch_bus",
+                fault_type=FaultType.JUMP_START,
+                start_s=0.0,
+                duration_s=10.0,
+                intensity=0.9,
+            ),
         ],
     )
     gen_n = TelemetryGenerator(cfg_nominal)
@@ -383,16 +403,23 @@ def test_load_dump_spikes_and_shuts_off():
         sample_interval_ms=50.0,
         channels=[ch],
         fault_injections=[
-            FaultInjection(channel_id="ch_bus", fault_type=FaultType.LOAD_DUMP,
-                           start_s=3.0, duration_s=2.0, intensity=1.0),
+            FaultInjection(
+                channel_id="ch_bus",
+                fault_type=FaultType.LOAD_DUMP,
+                start_s=3.0,
+                duration_s=2.0,
+                intensity=1.0,
+            ),
         ],
     )
     gen = TelemetryGenerator(cfg)
     df, labels = gen.generate()
-    fault_rows = df[df["timestamp"].between(
-        df["timestamp"].iloc[0] + pd.Timedelta(seconds=3),
-        df["timestamp"].iloc[0] + pd.Timedelta(seconds=5),
-    )]
+    fault_rows = df[
+        df["timestamp"].between(
+            df["timestamp"].iloc[0] + pd.Timedelta(seconds=3),
+            df["timestamp"].iloc[0] + pd.Timedelta(seconds=5),
+        )
+    ]
     # Bus should spike above 30 V
     assert fault_rows["voltage_v"].max() > 30.0, "Load dump should produce > 30 V spike"
     # Trip flag should be set (IC over-voltage protection fires)
@@ -410,21 +437,29 @@ def test_cold_crank_sags_bus_voltage():
         sample_interval_ms=100.0,
         channels=[ch],
         fault_injections=[
-            FaultInjection(channel_id="ch_bus", fault_type=FaultType.COLD_CRANK,
-                           start_s=5.0, duration_s=8.0, intensity=0.9),
+            FaultInjection(
+                channel_id="ch_bus",
+                fault_type=FaultType.COLD_CRANK,
+                start_s=5.0,
+                duration_s=8.0,
+                intensity=0.9,
+            ),
         ],
     )
     gen = TelemetryGenerator(cfg)
     df, labels = gen.generate()
-    fault_rows = df[df["timestamp"].between(
-        df["timestamp"].iloc[0] + pd.Timedelta(seconds=6),
-        df["timestamp"].iloc[0] + pd.Timedelta(seconds=12),
-    )]
+    fault_rows = df[
+        df["timestamp"].between(
+            df["timestamp"].iloc[0] + pd.Timedelta(seconds=6),
+            df["timestamp"].iloc[0] + pd.Timedelta(seconds=12),
+        )
+    ]
     min_v = fault_rows["voltage_v"].min()
     assert min_v < 9.0, f"Cold-crank should sag bus below 9 V, got {min_v:.2f} V"
     # Current should also be reduced from nominal
-    assert fault_rows["current_a"].median() < ch.nominal_current_a, \
+    assert fault_rows["current_a"].median() < ch.nominal_current_a, (
         "Current should be reduced during cold crank"
+    )
     assert labels["fault_type"].iloc[0] == FaultType.COLD_CRANK.value
 
 
@@ -436,33 +471,42 @@ def test_cold_crank_recovers_after_window():
         sample_interval_ms=100.0,
         channels=[ch],
         fault_injections=[
-            FaultInjection(channel_id="ch_bus", fault_type=FaultType.COLD_CRANK,
-                           start_s=5.0, duration_s=8.0, intensity=0.9),
+            FaultInjection(
+                channel_id="ch_bus",
+                fault_type=FaultType.COLD_CRANK,
+                start_s=5.0,
+                duration_s=8.0,
+                intensity=0.9,
+            ),
         ],
     )
     gen = TelemetryGenerator(cfg)
     df, _ = gen.generate()
     post_crank = df[df["timestamp"] > df["timestamp"].iloc[0] + pd.Timedelta(seconds=14)]
-    assert post_crank["voltage_v"].mean() > 12.0, \
+    assert post_crank["voltage_v"].mean() > 12.0, (
         "Bus voltage should recover above 12 V after cold-crank ends"
+    )
 
 
 def test_classifier_detects_jump_start():
     """RulesFaultClassifier should return JUMP_START when rolling_max_voltage > 16 V."""
     from src.models.anomaly import RulesFaultClassifier
+
     clf = RulesFaultClassifier()
-    fault, conf, causes = clf.classify({
-        "rolling_max_voltage": 19.5,
-        "voltage_v": 19.5,
-        "over_voltage_count": 3,
-        "spike_score": 0.0,
-        "trip_frequency": 0,
-        "temp_slope": 0.0,
-        "temperature_slope": 0.0,
-        "deg_trend": 0.0,
-        "degradation_trend": 0.0,
-        "protection_event": ProtectionEvent.OVER_VOLTAGE.value,
-    })
+    fault, conf, causes = clf.classify(
+        {
+            "rolling_max_voltage": 19.5,
+            "voltage_v": 19.5,
+            "over_voltage_count": 3,
+            "spike_score": 0.0,
+            "trip_frequency": 0,
+            "temp_slope": 0.0,
+            "temperature_slope": 0.0,
+            "deg_trend": 0.0,
+            "degradation_trend": 0.0,
+            "protection_event": ProtectionEvent.OVER_VOLTAGE.value,
+        }
+    )
     assert fault == FaultType.JUMP_START
     assert conf >= 0.65
 
@@ -470,17 +514,20 @@ def test_classifier_detects_jump_start():
 def test_classifier_detects_load_dump():
     """RulesFaultClassifier should return LOAD_DUMP when rolling_max_voltage > 30 V."""
     from src.models.anomaly import RulesFaultClassifier
+
     clf = RulesFaultClassifier()
-    fault, conf, causes = clf.classify({
-        "rolling_max_voltage": 38.0,
-        "voltage_v": 38.0,
-        "over_voltage_count": 5,
-        "spike_score": 0.0,
-        "trip_frequency": 0,
-        "temperature_slope": 0.0,
-        "degradation_trend": 0.0,
-        "protection_event": ProtectionEvent.OVER_VOLTAGE.value,
-    })
+    fault, conf, causes = clf.classify(
+        {
+            "rolling_max_voltage": 38.0,
+            "voltage_v": 38.0,
+            "over_voltage_count": 5,
+            "spike_score": 0.0,
+            "trip_frequency": 0,
+            "temperature_slope": 0.0,
+            "degradation_trend": 0.0,
+            "protection_event": ProtectionEvent.OVER_VOLTAGE.value,
+        }
+    )
     assert fault == FaultType.LOAD_DUMP
     assert conf >= 0.65
 
@@ -488,18 +535,21 @@ def test_classifier_detects_load_dump():
 def test_classifier_detects_cold_crank():
     """RulesFaultClassifier should return COLD_CRANK when rolling_min_voltage < 9 V."""
     from src.models.anomaly import RulesFaultClassifier
+
     clf = RulesFaultClassifier()
-    fault, conf, causes = clf.classify({
-        "rolling_min_voltage": 7.2,
-        "rolling_max_voltage": 13.5,
-        "voltage_v": 12.0,
-        "over_voltage_count": 0,
-        "spike_score": 0.0,
-        "trip_frequency": 0,
-        "temperature_slope": 0.0,
-        "degradation_trend": 0.0,
-        "protection_event": ProtectionEvent.NONE.value,
-    })
+    fault, conf, causes = clf.classify(
+        {
+            "rolling_min_voltage": 7.2,
+            "rolling_max_voltage": 13.5,
+            "voltage_v": 12.0,
+            "over_voltage_count": 0,
+            "spike_score": 0.0,
+            "trip_frequency": 0,
+            "temperature_slope": 0.0,
+            "degradation_trend": 0.0,
+            "protection_event": ProtectionEvent.NONE.value,
+        }
+    )
     assert fault == FaultType.COLD_CRANK
     assert conf >= 0.5
 
@@ -507,6 +557,7 @@ def test_classifier_detects_cold_crank():
 # ---------------------------------------------------------------------------
 # Gap #6 — Wire harness resistance + connector aging
 # ---------------------------------------------------------------------------
+
 
 def _make_ch_harness(
     harness_r_ohm: float = 0.020,
@@ -538,15 +589,21 @@ def test_harness_r_raises_voltage_drop():
 
     def _gen(ch):
         cfg = SimulationConfig(
-            scenario_id="test", name="T", duration_s=10.0, sample_interval_ms=100.0,
-            seed=42, channels=[ch], fault_injections=[],
+            scenario_id="test",
+            name="T",
+            duration_s=10.0,
+            sample_interval_ms=100.0,
+            seed=42,
+            channels=[ch],
+            fault_injections=[],
         )
         return TelemetryGenerator(cfg).generate()[0]
 
     df_low = _gen(ch_low)
     df_high = _gen(ch_high)
-    assert df_high["voltage_v"].mean() < df_low["voltage_v"].mean(), \
+    assert df_high["voltage_v"].mean() < df_low["voltage_v"].mean(), (
         "Higher harness R should yield lower measured voltage"
+    )
 
 
 def test_connector_aging_drops_voltage_over_time():
@@ -558,8 +615,11 @@ def test_connector_aging_drops_voltage_over_time():
         channels=[ch],
         fault_injections=[
             FaultInjection(
-                channel_id="ch_harness", fault_type=FaultType.CONNECTOR_AGING,
-                start_s=10.0, duration_s=40.0, intensity=0.9,
+                channel_id="ch_harness",
+                fault_type=FaultType.CONNECTOR_AGING,
+                start_s=10.0,
+                duration_s=40.0,
+                intensity=0.9,
             ),
         ],
     )
@@ -588,16 +648,17 @@ def test_connector_aging_current_reduction():
         channels=[ch],
         fault_injections=[
             FaultInjection(
-                channel_id="ch_harness", fault_type=FaultType.CONNECTOR_AGING,
-                start_s=5.0, duration_s=50.0, intensity=1.0,
+                channel_id="ch_harness",
+                fault_type=FaultType.CONNECTOR_AGING,
+                start_s=5.0,
+                duration_s=50.0,
+                intensity=1.0,
             ),
         ],
     )
     gen = TelemetryGenerator(cfg)
     df, _ = gen.generate()
-    fault_rows = df[
-        df["timestamp"] >= df["timestamp"].iloc[0] + pd.Timedelta(seconds=5)
-    ]
+    fault_rows = df[df["timestamp"] >= df["timestamp"].iloc[0] + pd.Timedelta(seconds=5)]
     first_mean = fault_rows.iloc[:10]["current_a"].mean()
     last_mean = fault_rows.iloc[-10:]["current_a"].mean()
     assert last_mean <= first_mean * 1.05, (
@@ -614,8 +675,11 @@ def test_connector_aging_no_trip():
         channels=[ch],
         fault_injections=[
             FaultInjection(
-                channel_id="ch_harness", fault_type=FaultType.CONNECTOR_AGING,
-                start_s=0.0, duration_s=30.0, intensity=0.8,
+                channel_id="ch_harness",
+                fault_type=FaultType.CONNECTOR_AGING,
+                start_s=0.0,
+                duration_s=30.0,
+                intensity=0.8,
             ),
         ],
     )
@@ -627,22 +691,25 @@ def test_connector_aging_no_trip():
 def test_classifier_detects_connector_aging():
     """RulesFaultClassifier should return CONNECTOR_AGING for elevated voltage drop."""
     from src.models.anomaly import RulesFaultClassifier
+
     clf = RulesFaultClassifier()
-    fault, conf, causes = clf.classify({
-        "rolling_voltage_drop": 0.85,
-        "voltage_v": 12.6,
-        "rolling_min_voltage": 12.5,
-        "rolling_max_voltage": 13.5,
-        "over_voltage_count": 0,
-        "spike_score": 0.1,
-        "trip_flag": False,
-        "overload_flag": False,
-        "trip_frequency": 0,
-        "temperature_slope": 0.01,
-        "degradation_trend": 0.0,
-        "protection_event": ProtectionEvent.NONE.value,
-        "missing_rate": 0.0,
-    })
+    fault, conf, causes = clf.classify(
+        {
+            "rolling_voltage_drop": 0.85,
+            "voltage_v": 12.6,
+            "rolling_min_voltage": 12.5,
+            "rolling_max_voltage": 13.5,
+            "over_voltage_count": 0,
+            "spike_score": 0.1,
+            "trip_flag": False,
+            "overload_flag": False,
+            "trip_frequency": 0,
+            "temperature_slope": 0.01,
+            "degradation_trend": 0.0,
+            "protection_event": ProtectionEvent.NONE.value,
+            "missing_rate": 0.0,
+        }
+    )
     assert fault == FaultType.CONNECTOR_AGING
     assert conf >= 0.4
     assert any("voltage drop" in c.lower() for c in causes)
@@ -652,24 +719,36 @@ def test_classifier_detects_connector_aging():
 # Gap #7 — Multi-channel die thermal coupling
 # ---------------------------------------------------------------------------
 
+
 def _make_die_channels(
     die_id: str = "die_A",
     coupling: float = 0.20,
 ) -> list[ChannelMeta]:
     """Two channels sharing a die: ch_hot (high current) and ch_cold (low current)."""
     common = dict(
-        max_current_a=20.0, fuse_rating_a=15.0,
-        thermal_shutdown_c=150.0, r_thermal_kw=30.0, tau_thermal_s=5.0,
-        t_ambient_c=25.0, rds_on_tempco_exp=0.0,
-        die_id=die_id, thermal_coupling_coeff=coupling,
+        max_current_a=20.0,
+        fuse_rating_a=15.0,
+        thermal_shutdown_c=150.0,
+        r_thermal_kw=30.0,
+        tau_thermal_s=5.0,
+        t_ambient_c=25.0,
+        rds_on_tempco_exp=0.0,
+        die_id=die_id,
+        thermal_coupling_coeff=coupling,
     )
     ch_hot = ChannelMeta(
-        channel_id="ch_hot", load_name="seat_heater",
-        nominal_current_a=12.0, r_ds_on_ohm=0.006, **common,
+        channel_id="ch_hot",
+        load_name="seat_heater",
+        nominal_current_a=12.0,
+        r_ds_on_ohm=0.006,
+        **common,
     )
     ch_cold = ChannelMeta(
-        channel_id="ch_cold", load_name="mirror_adjust",
-        nominal_current_a=1.5, r_ds_on_ohm=0.010, **common,
+        channel_id="ch_cold",
+        load_name="mirror_adjust",
+        nominal_current_a=1.5,
+        r_ds_on_ohm=0.010,
+        **common,
     )
     return [ch_hot, ch_cold]
 
@@ -678,21 +757,31 @@ def test_coupled_channel_runs_hotter_than_isolated():
     """ch_cold on shared die should be hotter than an isolated ch_cold with same current."""
     ch_coupled, ch_cold_coupled = _make_die_channels()
     ch_isolated = ChannelMeta(
-        channel_id="ch_cold", load_name="mirror_adjust",
-        nominal_current_a=1.5, r_ds_on_ohm=0.010,
-        max_current_a=20.0, fuse_rating_a=15.0,
-        thermal_shutdown_c=150.0, r_thermal_kw=30.0, tau_thermal_s=5.0,
-        t_ambient_c=25.0, rds_on_tempco_exp=0.0,
+        channel_id="ch_cold",
+        load_name="mirror_adjust",
+        nominal_current_a=1.5,
+        r_ds_on_ohm=0.010,
+        max_current_a=20.0,
+        fuse_rating_a=15.0,
+        thermal_shutdown_c=150.0,
+        r_thermal_kw=30.0,
+        tau_thermal_s=5.0,
+        t_ambient_c=25.0,
+        rds_on_tempco_exp=0.0,
         die_id="",  # isolated
     )
 
     cfg_coupled = _make_config(
-        duration_s=30.0, sample_interval_ms=100.0,
-        channels=[ch_coupled, ch_cold_coupled], fault_injections=[],
+        duration_s=30.0,
+        sample_interval_ms=100.0,
+        channels=[ch_coupled, ch_cold_coupled],
+        fault_injections=[],
     )
     cfg_isolated = _make_config(
-        duration_s=30.0, sample_interval_ms=100.0,
-        channels=[ch_isolated], fault_injections=[],
+        duration_s=30.0,
+        sample_interval_ms=100.0,
+        channels=[ch_isolated],
+        fault_injections=[],
     )
     gen_c = TelemetryGenerator(cfg_coupled)
     gen_i = TelemetryGenerator(cfg_isolated)
@@ -703,12 +792,11 @@ def test_coupled_channel_runs_hotter_than_isolated():
     t0_c = df_c["timestamp"].min()
     t0_i = df_i["timestamp"].min()
     cold_coupled_temp = df_c[
-        (df_c["channel_id"] == "ch_cold")
-        & (df_c["timestamp"] > t0_c + pd.Timedelta(seconds=20))
+        (df_c["channel_id"] == "ch_cold") & (df_c["timestamp"] > t0_c + pd.Timedelta(seconds=20))
     ]["temperature_c"].mean()
-    cold_isolated_temp = df_i[
-        df_i["timestamp"] > t0_i + pd.Timedelta(seconds=20)
-    ]["temperature_c"].mean()
+    cold_isolated_temp = df_i[df_i["timestamp"] > t0_i + pd.Timedelta(seconds=20)][
+        "temperature_c"
+    ].mean()
 
     assert cold_coupled_temp > cold_isolated_temp, (
         f"Coupled channel ({cold_coupled_temp:.2f}°C) should be hotter than "
@@ -721,15 +809,26 @@ def test_hot_channel_does_not_affect_temperature_with_zero_coupling():
     channels = _make_die_channels(coupling=0.0)
 
     ch_isolated = ChannelMeta(
-        channel_id="ch_cold", load_name="mirror_adjust",
-        nominal_current_a=1.5, r_ds_on_ohm=0.010,
-        max_current_a=20.0, fuse_rating_a=15.0,
-        thermal_shutdown_c=150.0, r_thermal_kw=30.0, tau_thermal_s=5.0,
-        t_ambient_c=25.0, rds_on_tempco_exp=0.0, die_id="",
+        channel_id="ch_cold",
+        load_name="mirror_adjust",
+        nominal_current_a=1.5,
+        r_ds_on_ohm=0.010,
+        max_current_a=20.0,
+        fuse_rating_a=15.0,
+        thermal_shutdown_c=150.0,
+        r_thermal_kw=30.0,
+        tau_thermal_s=5.0,
+        t_ambient_c=25.0,
+        rds_on_tempco_exp=0.0,
+        die_id="",
     )
 
-    cfg_zero = _make_config(duration_s=20.0, sample_interval_ms=100.0, channels=channels, fault_injections=[])
-    cfg_iso = _make_config(duration_s=20.0, sample_interval_ms=100.0, channels=[ch_isolated], fault_injections=[])
+    cfg_zero = _make_config(
+        duration_s=20.0, sample_interval_ms=100.0, channels=channels, fault_injections=[]
+    )
+    cfg_iso = _make_config(
+        duration_s=20.0, sample_interval_ms=100.0, channels=[ch_isolated], fault_injections=[]
+    )
 
     df_zero, _ = TelemetryGenerator(cfg_zero).generate()
     df_iso, _ = TelemetryGenerator(cfg_iso).generate()
@@ -737,11 +836,10 @@ def test_hot_channel_does_not_affect_temperature_with_zero_coupling():
     t0_z = df_zero["timestamp"].min()
     t0_i = df_iso["timestamp"].min()
     temp_zero = df_zero[
-        (df_zero["channel_id"] == "ch_cold") & (df_zero["timestamp"] > t0_z + pd.Timedelta(seconds=15))
+        (df_zero["channel_id"] == "ch_cold")
+        & (df_zero["timestamp"] > t0_z + pd.Timedelta(seconds=15))
     ]["temperature_c"].mean()
-    temp_iso = df_iso[
-        df_iso["timestamp"] > t0_i + pd.Timedelta(seconds=15)
-    ]["temperature_c"].mean()
+    temp_iso = df_iso[df_iso["timestamp"] > t0_i + pd.Timedelta(seconds=15)]["temperature_c"].mean()
 
     assert abs(temp_zero - temp_iso) < 1.0, (
         f"Zero coupling should produce same temp as isolated: "
@@ -752,68 +850,98 @@ def test_hot_channel_does_not_affect_temperature_with_zero_coupling():
 def test_isolated_channels_not_affected_by_coupling():
     """Channels with different die_ids should not thermally interact."""
     ch_a = ChannelMeta(
-        channel_id="ch_a", load_name="load_a",
-        nominal_current_a=12.0, r_ds_on_ohm=0.006,
-        max_current_a=20.0, fuse_rating_a=15.0,
-        thermal_shutdown_c=150.0, r_thermal_kw=30.0, tau_thermal_s=5.0,
-        t_ambient_c=25.0, rds_on_tempco_exp=0.0, die_id="die_X",
+        channel_id="ch_a",
+        load_name="load_a",
+        nominal_current_a=12.0,
+        r_ds_on_ohm=0.006,
+        max_current_a=20.0,
+        fuse_rating_a=15.0,
+        thermal_shutdown_c=150.0,
+        r_thermal_kw=30.0,
+        tau_thermal_s=5.0,
+        t_ambient_c=25.0,
+        rds_on_tempco_exp=0.0,
+        die_id="die_X",
     )
     ch_b = ChannelMeta(
-        channel_id="ch_b", load_name="load_b",
-        nominal_current_a=1.5, r_ds_on_ohm=0.010,
-        max_current_a=20.0, fuse_rating_a=15.0,
-        thermal_shutdown_c=150.0, r_thermal_kw=30.0, tau_thermal_s=5.0,
-        t_ambient_c=25.0, rds_on_tempco_exp=0.0, die_id="die_Y",  # different die
+        channel_id="ch_b",
+        load_name="load_b",
+        nominal_current_a=1.5,
+        r_ds_on_ohm=0.010,
+        max_current_a=20.0,
+        fuse_rating_a=15.0,
+        thermal_shutdown_c=150.0,
+        r_thermal_kw=30.0,
+        tau_thermal_s=5.0,
+        t_ambient_c=25.0,
+        rds_on_tempco_exp=0.0,
+        die_id="die_Y",  # different die
     )
     ch_b_iso = ChannelMeta(
-        channel_id="ch_b", load_name="load_b",
-        nominal_current_a=1.5, r_ds_on_ohm=0.010,
-        max_current_a=20.0, fuse_rating_a=15.0,
-        thermal_shutdown_c=150.0, r_thermal_kw=30.0, tau_thermal_s=5.0,
-        t_ambient_c=25.0, rds_on_tempco_exp=0.0, die_id="",
+        channel_id="ch_b",
+        load_name="load_b",
+        nominal_current_a=1.5,
+        r_ds_on_ohm=0.010,
+        max_current_a=20.0,
+        fuse_rating_a=15.0,
+        thermal_shutdown_c=150.0,
+        r_thermal_kw=30.0,
+        tau_thermal_s=5.0,
+        t_ambient_c=25.0,
+        rds_on_tempco_exp=0.0,
+        die_id="",
     )
 
-    df_diff, _ = TelemetryGenerator(_make_config(
-        duration_s=20.0, sample_interval_ms=100.0, channels=[ch_a, ch_b], fault_injections=[],
-    )).generate()
-    df_iso, _ = TelemetryGenerator(_make_config(
-        duration_s=20.0, sample_interval_ms=100.0, channels=[ch_b_iso], fault_injections=[],
-    )).generate()
+    df_diff, _ = TelemetryGenerator(
+        _make_config(
+            duration_s=20.0,
+            sample_interval_ms=100.0,
+            channels=[ch_a, ch_b],
+            fault_injections=[],
+        )
+    ).generate()
+    df_iso, _ = TelemetryGenerator(
+        _make_config(
+            duration_s=20.0,
+            sample_interval_ms=100.0,
+            channels=[ch_b_iso],
+            fault_injections=[],
+        )
+    ).generate()
 
     t0_d = df_diff["timestamp"].min()
     t0_i = df_iso["timestamp"].min()
     temp_diff = df_diff[
         (df_diff["channel_id"] == "ch_b") & (df_diff["timestamp"] > t0_d + pd.Timedelta(seconds=15))
     ]["temperature_c"].mean()
-    temp_iso = df_iso[
-        df_iso["timestamp"] > t0_i + pd.Timedelta(seconds=15)
-    ]["temperature_c"].mean()
+    temp_iso = df_iso[df_iso["timestamp"] > t0_i + pd.Timedelta(seconds=15)]["temperature_c"].mean()
 
-    assert abs(temp_diff - temp_iso) < 1.0, (
-        "Different-die channels should not thermally interact"
-    )
+    assert abs(temp_diff - temp_iso) < 1.0, "Different-die channels should not thermally interact"
 
 
 def test_classifier_detects_thermal_coupling():
     """RulesFaultClassifier should return THERMAL_COUPLING for moderate temp slope, nominal current."""
     from src.models.anomaly import RulesFaultClassifier
+
     clf = RulesFaultClassifier()
-    fault, conf, causes = clf.classify({
-        "temperature_slope": 0.25,   # moderate rise — not extreme
-        "spike_score": 0.3,
-        "trip_flag": False,
-        "overload_flag": False,
-        "trip_frequency": 0,
-        "degradation_trend": 0.0,
-        "rolling_rms_current": 1.5,
-        "current_a": 1.5,            # nominal current — not self-heating
-        "voltage_v": 13.5,
-        "rolling_min_voltage": 13.0,
-        "rolling_max_voltage": 14.0,
-        "over_voltage_count": 0,
-        "protection_event": ProtectionEvent.NONE.value,
-        "missing_rate": 0.0,
-    })
+    fault, conf, causes = clf.classify(
+        {
+            "temperature_slope": 0.25,  # moderate rise — not extreme
+            "spike_score": 0.3,
+            "trip_flag": False,
+            "overload_flag": False,
+            "trip_frequency": 0,
+            "degradation_trend": 0.0,
+            "rolling_rms_current": 1.5,
+            "current_a": 1.5,  # nominal current — not self-heating
+            "voltage_v": 13.5,
+            "rolling_min_voltage": 13.0,
+            "rolling_max_voltage": 14.0,
+            "over_voltage_count": 0,
+            "protection_event": ProtectionEvent.NONE.value,
+            "missing_rate": 0.0,
+        }
+    )
     assert fault == FaultType.THERMAL_COUPLING, f"Expected THERMAL_COUPLING, got {fault}"
     assert conf > 0
     assert any("co-die" in c.lower() or "coupling" in c.lower() for c in causes)
@@ -823,15 +951,22 @@ def test_classifier_detects_thermal_coupling():
 # Gap #8 — Sleep / wake power states
 # ---------------------------------------------------------------------------
 
+
 def _make_ch_kl15(**extra) -> ChannelMeta:
     """KL15 (IGNITION) channel for sleep/wake tests."""
     kw: dict = dict(wake_inrush_factor=2.5, wake_inrush_duration_ms=100.0)
     kw.update(extra)
     return ChannelMeta(
-        channel_id="ch_ign", load_name="headlamp",
-        nominal_current_a=6.0, max_current_a=20.0, fuse_rating_a=15.0,
-        thermal_shutdown_c=150.0, r_thermal_kw=20.0, tau_thermal_s=10.0,
-        t_ambient_c=25.0, rds_on_tempco_exp=0.0,
+        channel_id="ch_ign",
+        load_name="headlamp",
+        nominal_current_a=6.0,
+        max_current_a=20.0,
+        fuse_rating_a=15.0,
+        thermal_shutdown_c=150.0,
+        r_thermal_kw=20.0,
+        tau_thermal_s=10.0,
+        t_ambient_c=25.0,
+        rds_on_tempco_exp=0.0,
         power_class=PowerClass.IGNITION,
         **kw,
     )
@@ -840,10 +975,16 @@ def _make_ch_kl15(**extra) -> ChannelMeta:
 def _make_ch_kl30(**extra) -> ChannelMeta:
     """KL30 (ALWAYS_ON) channel for dark-current sleep tests."""
     return ChannelMeta(
-        channel_id="ch_kl30", load_name="clock_memory",
-        nominal_current_a=0.05, max_current_a=1.0, fuse_rating_a=2.0,
-        thermal_shutdown_c=150.0, r_thermal_kw=20.0, tau_thermal_s=10.0,
-        t_ambient_c=25.0, rds_on_tempco_exp=0.0,
+        channel_id="ch_kl30",
+        load_name="clock_memory",
+        nominal_current_a=0.05,
+        max_current_a=1.0,
+        fuse_rating_a=2.0,
+        thermal_shutdown_c=150.0,
+        r_thermal_kw=20.0,
+        tau_thermal_s=10.0,
+        t_ambient_c=25.0,
+        rds_on_tempco_exp=0.0,
         power_class=PowerClass.ALWAYS_ON,
         sleep_quiescent_ua=300.0,
         **extra,
@@ -854,8 +995,10 @@ def test_ignition_channel_off_during_sleep():
     """KL15 IGNITION channel should have near-zero current during SLEEP state."""
     ch = _make_ch_kl15()
     cfg = _make_config(
-        duration_s=20.0, sample_interval_ms=100.0,
-        channels=[ch], fault_injections=[],
+        duration_s=20.0,
+        sample_interval_ms=100.0,
+        channels=[ch],
+        fault_injections=[],
         power_state_events=[
             PowerStateEvent(time_s=0.0, state=PowerState.SLEEP),
             PowerStateEvent(time_s=10.0, state=PowerState.ACTIVE),
@@ -864,18 +1007,22 @@ def test_ignition_channel_off_during_sleep():
     gen = TelemetryGenerator(cfg)
     df, _ = gen.generate()
     sleep_rows = df[df["timestamp"] < df["timestamp"].iloc[0] + pd.Timedelta(seconds=9.9)]
-    assert sleep_rows["current_a"].abs().max() < 0.005, \
+    assert sleep_rows["current_a"].abs().max() < 0.005, (
         "Ignition channel current should be < 5 mA during SLEEP"
-    assert not sleep_rows["state_on_off"].any(), \
+    )
+    assert not sleep_rows["state_on_off"].any(), (
         "Ignition channel state_on_off should be False during SLEEP"
+    )
 
 
 def test_always_on_channel_dark_current_during_sleep():
     """KL30 ALWAYS_ON channel should draw quiescent dark current during SLEEP."""
     ch = _make_ch_kl30()
     cfg = _make_config(
-        duration_s=20.0, sample_interval_ms=100.0,
-        channels=[ch], fault_injections=[],
+        duration_s=20.0,
+        sample_interval_ms=100.0,
+        channels=[ch],
+        fault_injections=[],
         power_state_events=[
             PowerStateEvent(time_s=0.0, state=PowerState.SLEEP),
         ],
@@ -884,34 +1031,41 @@ def test_always_on_channel_dark_current_during_sleep():
     df, _ = gen.generate()
     # Should stay ON with quiescent current ~300 µA (not zero)
     assert df["state_on_off"].all(), "ALWAYS_ON channel should remain ON during SLEEP"
-    assert df["current_a"].mean() < 0.002, \
+    assert df["current_a"].mean() < 0.002, (
         "ALWAYS_ON sleep current should be < 2 mA (quiescent only)"
-    assert df["current_a"].mean() > 0.0001, \
+    )
+    assert df["current_a"].mean() > 0.0001, (
         "ALWAYS_ON sleep current should be above zero (dark current)"
+    )
 
 
 def test_ignition_channel_nominal_during_active():
     """KL15 channel should carry nominal current when power state is ACTIVE."""
     ch = _make_ch_kl15()
     cfg = _make_config(
-        duration_s=10.0, sample_interval_ms=100.0,
-        channels=[ch], fault_injections=[],
+        duration_s=10.0,
+        sample_interval_ms=100.0,
+        channels=[ch],
+        fault_injections=[],
         power_state_events=[
             PowerStateEvent(time_s=0.0, state=PowerState.ACTIVE),
         ],
     )
     gen = TelemetryGenerator(cfg)
     df, _ = gen.generate()
-    assert df["current_a"].mean() > ch.nominal_current_a * 0.5, \
+    assert df["current_a"].mean() > ch.nominal_current_a * 0.5, (
         "Current should be near nominal during ACTIVE state (0.5x accounts for ISENSE gain error)"
+    )
 
 
 def test_wake_transition_inrush():
     """On SLEEP→ACTIVE transition, wake_inrush_factor should create a current spike."""
     ch = _make_ch_kl15(wake_inrush_factor=3.0, wake_inrush_duration_ms=200.0)
     cfg = _make_config(
-        duration_s=30.0, sample_interval_ms=100.0,
-        channels=[ch], fault_injections=[],
+        duration_s=30.0,
+        sample_interval_ms=100.0,
+        channels=[ch],
+        fault_injections=[],
         power_state_events=[
             PowerStateEvent(time_s=0.0, state=PowerState.SLEEP),
             PowerStateEvent(time_s=10.0, state=PowerState.ACTIVE),
@@ -925,26 +1079,36 @@ def test_wake_transition_inrush():
         (df["timestamp"] >= wake_time)
         & (df["timestamp"] <= wake_time + pd.Timedelta(milliseconds=300))
     ]
-    assert post_wake["current_a"].max() > ch.nominal_current_a * 1.5, \
+    assert post_wake["current_a"].max() > ch.nominal_current_a * 1.5, (
         "Wake inrush should produce a current spike above 1.5x nominal"
+    )
     # Should settle back to nominal within inrush window
     settled = df[df["timestamp"] > wake_time + pd.Timedelta(milliseconds=500)]
-    assert settled["current_a"].mean() < ch.nominal_current_a * 1.5, \
+    assert settled["current_a"].mean() < ch.nominal_current_a * 1.5, (
         "Current should settle to near nominal after inrush ends (1.5x accounts for ISENSE gain)"
+    )
 
 
 def test_start_channel_only_active_during_crank():
     """KL50 START channel should only carry current during CRANK state."""
     ch = ChannelMeta(
-        channel_id="ch_start", load_name="starter_relay",
-        nominal_current_a=2.0, max_current_a=10.0, fuse_rating_a=8.0,
-        thermal_shutdown_c=150.0, r_thermal_kw=20.0, tau_thermal_s=10.0,
-        t_ambient_c=25.0, rds_on_tempco_exp=0.0,
+        channel_id="ch_start",
+        load_name="starter_relay",
+        nominal_current_a=2.0,
+        max_current_a=10.0,
+        fuse_rating_a=8.0,
+        thermal_shutdown_c=150.0,
+        r_thermal_kw=20.0,
+        tau_thermal_s=10.0,
+        t_ambient_c=25.0,
+        rds_on_tempco_exp=0.0,
         power_class=PowerClass.START,
     )
     cfg = _make_config(
-        duration_s=20.0, sample_interval_ms=100.0,
-        channels=[ch], fault_injections=[],
+        duration_s=20.0,
+        sample_interval_ms=100.0,
+        channels=[ch],
+        fault_injections=[],
         power_state_events=[
             PowerStateEvent(time_s=0.0, state=PowerState.ACTIVE),
             PowerStateEvent(time_s=5.0, state=PowerState.CRANK),
@@ -968,9 +1132,13 @@ def test_start_channel_only_active_during_crank():
 def test_power_state_events_in_config():
     """SimulationConfig should accept power_state_events and they should be accessible."""
     from src.config.models import SimulationConfig
+
     cfg = SimulationConfig(
-        scenario_id="ps_test", name="Power State Test",
-        duration_s=30.0, sample_interval_ms=100.0, seed=1,
+        scenario_id="ps_test",
+        name="Power State Test",
+        duration_s=30.0,
+        sample_interval_ms=100.0,
+        seed=1,
         channels=[_make_ch_kl15()],
         power_state_events=[
             PowerStateEvent(time_s=0.0, state=PowerState.SLEEP),
@@ -986,24 +1154,27 @@ def test_power_state_events_in_config():
 def test_classifier_detects_wake_transient():
     """RulesFaultClassifier should return WAKE_TRANSIENT for spike after near-zero period."""
     from src.models.anomaly import RulesFaultClassifier
+
     clf = RulesFaultClassifier()
-    fault, conf, causes = clf.classify({
-        "spike_score": 3.5,
-        "trip_flag": False,
-        "overload_flag": False,
-        "rolling_min_current": 0.0005,  # was sleeping
-        "rolling_rms_current": 5.0,
-        "current_a": 5.0,
-        "voltage_v": 13.5,
-        "rolling_min_voltage": 13.0,
-        "rolling_max_voltage": 14.0,
-        "over_voltage_count": 0,
-        "trip_frequency": 0,
-        "temperature_slope": 0.01,
-        "degradation_trend": 0.0,
-        "protection_event": ProtectionEvent.NONE.value,
-        "missing_rate": 0.0,
-    })
+    fault, conf, causes = clf.classify(
+        {
+            "spike_score": 3.5,
+            "trip_flag": False,
+            "overload_flag": False,
+            "rolling_min_current": 0.0005,  # was sleeping
+            "rolling_rms_current": 5.0,
+            "current_a": 5.0,
+            "voltage_v": 13.5,
+            "rolling_min_voltage": 13.0,
+            "rolling_max_voltage": 14.0,
+            "over_voltage_count": 0,
+            "trip_frequency": 0,
+            "temperature_slope": 0.01,
+            "degradation_trend": 0.0,
+            "protection_event": ProtectionEvent.NONE.value,
+            "missing_rate": 0.0,
+        }
+    )
     assert fault == FaultType.WAKE_TRANSIENT, f"Expected WAKE_TRANSIENT, got {fault}"
     assert conf > 0
     assert any("wake" in c.lower() or "inrush" in c.lower() for c in causes)

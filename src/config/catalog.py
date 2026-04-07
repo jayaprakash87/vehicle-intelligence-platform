@@ -504,211 +504,567 @@ def example_topology() -> tuple[list[ZoneController], list[dict]]:
 
     # ── Rear zone (25 channels) ──────────────────────────────────
     # Seating comfort
-    _add("zone_rear", "inf_hs_11a", "seat_adjust_rear",
-         system_cluster="body_comfort", system_name="seat_adjustment")
-    _add("zone_rear", "inf_hs_9a", "seat_heater_rear_right",
-         load_type="ptc", pwm_capable=True,
-         system_cluster="body_comfort", system_name="seat_heating")
-    _add("zone_rear", "inf_hs_9a", "seat_heater_rear_left",
-         load_type="ptc", pwm_capable=True,
-         system_cluster="body_comfort", system_name="seat_heating")
-    _add("zone_rear", "inf_hs_5a", "seat_ventilation_pump",
-         load_type="motor", inrush_factor=3.0, inrush_duration_ms=40.0,
-         system_cluster="body_comfort", system_name="seat_ventilation")
-    _add("zone_rear", "inf_hs_5a", "seatbelt_heater_rear",
-         load_type="ptc", pwm_capable=True,
-         system_cluster="body_comfort", system_name="heated_surfaces")
+    _add(
+        "zone_rear",
+        "inf_hs_11a",
+        "seat_adjust_rear",
+        system_cluster="body_comfort",
+        system_name="seat_adjustment",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_9a",
+        "seat_heater_rear_right",
+        load_type="ptc",
+        pwm_capable=True,
+        system_cluster="body_comfort",
+        system_name="seat_heating",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_9a",
+        "seat_heater_rear_left",
+        load_type="ptc",
+        pwm_capable=True,
+        system_cluster="body_comfort",
+        system_name="seat_heating",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_5a",
+        "seat_ventilation_pump",
+        load_type="motor",
+        inrush_factor=3.0,
+        inrush_duration_ms=40.0,
+        system_cluster="body_comfort",
+        system_name="seat_ventilation",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_5a",
+        "seatbelt_heater_rear",
+        load_type="ptc",
+        pwm_capable=True,
+        system_cluster="body_comfort",
+        system_name="heated_surfaces",
+    )
     # Infotainment
-    _add("zone_rear", "inf_hs_2a", "wireless_charger_rear_1",
-         load_type="capacitive",
-         system_cluster="infotainment", system_name="connectivity")
-    _add("zone_rear", "inf_hs_2a", "wireless_charger_rear_2",
-         load_type="capacitive",
-         system_cluster="infotainment", system_name="connectivity")
-    _add("zone_rear", "inf_hs_5a", "media_hub_rear",
-         load_type="capacitive",
-         system_cluster="infotainment", system_name="media_interface")
+    _add(
+        "zone_rear",
+        "inf_hs_2a",
+        "wireless_charger_rear_1",
+        load_type="capacitive",
+        system_cluster="infotainment",
+        system_name="connectivity",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_2a",
+        "wireless_charger_rear_2",
+        load_type="capacitive",
+        system_cluster="infotainment",
+        system_name="connectivity",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_5a",
+        "media_hub_rear",
+        load_type="capacitive",
+        system_cluster="infotainment",
+        system_name="media_interface",
+    )
     # Exterior lighting
-    _add("zone_rear", "inf_hs_9a", "tail_light_left",
-         connected_loads=["tail_light_left", "brake_light_left"],
-         system_cluster="exterior_lighting", system_name="rear_lighting",
-         pwm_capable=True, power_class="always_on")
-    _add("zone_rear", "inf_hs_9a", "tail_light_right",
-         connected_loads=["tail_light_right", "brake_light_right"],
-         system_cluster="exterior_lighting", system_name="rear_lighting",
-         pwm_capable=True, power_class="always_on")
-    _add("zone_rear", "inf_hs_5a", "center_stop_lamp",
-         system_cluster="exterior_lighting", system_name="rear_lighting",
-         pwm_capable=True)
-    _add("zone_rear", "inf_hs_11a", "rear_defroster",
-         load_type="ptc", pwm_capable=True,
-         system_cluster="body_comfort", system_name="climate_support")
+    _add(
+        "zone_rear",
+        "inf_hs_9a",
+        "tail_light_left",
+        connected_loads=["tail_light_left", "brake_light_left"],
+        system_cluster="exterior_lighting",
+        system_name="rear_lighting",
+        pwm_capable=True,
+        power_class="always_on",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_9a",
+        "tail_light_right",
+        connected_loads=["tail_light_right", "brake_light_right"],
+        system_cluster="exterior_lighting",
+        system_name="rear_lighting",
+        pwm_capable=True,
+        power_class="always_on",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_5a",
+        "center_stop_lamp",
+        system_cluster="exterior_lighting",
+        system_name="rear_lighting",
+        pwm_capable=True,
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_11a",
+        "rear_defroster",
+        load_type="ptc",
+        pwm_capable=True,
+        system_cluster="body_comfort",
+        system_name="climate_support",
+    )
     # Audio
-    _add("zone_rear", "inf_hs_14a", "amplifier_main",
-         system_cluster="infotainment", system_name="audio_system")
-    _add("zone_rear", "inf_hs_14a", "amplifier_subwoofer",
-         system_cluster="infotainment", system_name="audio_system")
+    _add(
+        "zone_rear",
+        "inf_hs_14a",
+        "amplifier_main",
+        system_cluster="infotainment",
+        system_name="audio_system",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_14a",
+        "amplifier_subwoofer",
+        system_cluster="infotainment",
+        system_name="audio_system",
+    )
     # Energy / charging
-    _add("zone_rear", "inf_hs_18a", "charge_port_controller",
-         system_cluster="energy_management", system_name="charging")
-    _add("zone_rear", "inf_hs_5a", "power_outlet_rear",
-         system_cluster="energy_management", system_name="auxiliary_power")
-    _add("zone_rear", "inf_hs_5a", "socket_12v_rear",
-         system_cluster="energy_management", system_name="auxiliary_power")
+    _add(
+        "zone_rear",
+        "inf_hs_18a",
+        "charge_port_controller",
+        system_cluster="energy_management",
+        system_name="charging",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_5a",
+        "power_outlet_rear",
+        system_cluster="energy_management",
+        system_name="auxiliary_power",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_5a",
+        "socket_12v_rear",
+        system_cluster="energy_management",
+        system_name="auxiliary_power",
+    )
     # Drivetrain / chassis
-    _add("zone_rear", "inf_hs_28a", "rear_drive_inverter",
-         system_cluster="drivetrain", system_name="electric_drive")
-    _add("zone_rear", "st_hb_30a", "deployable_step",
-         load_type="motor", inrush_factor=5.0, inrush_duration_ms=80.0,
-         system_cluster="body_comfort", system_name="convenience_actuators",
-         driver_type="h_bridge")
-    _add("zone_rear", "inf_hs_14a", "rear_steer_actuator",
-         system_cluster="drivetrain", system_name="rear_axle_steering")
+    _add(
+        "zone_rear",
+        "inf_hs_28a",
+        "rear_drive_inverter",
+        system_cluster="drivetrain",
+        system_name="electric_drive",
+    )
+    _add(
+        "zone_rear",
+        "st_hb_30a",
+        "deployable_step",
+        load_type="motor",
+        inrush_factor=5.0,
+        inrush_duration_ms=80.0,
+        system_cluster="body_comfort",
+        system_name="convenience_actuators",
+        driver_type="h_bridge",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_14a",
+        "rear_steer_actuator",
+        system_cluster="drivetrain",
+        system_name="rear_axle_steering",
+    )
     # ADAS
-    _add("zone_rear", "inf_hs_2a", "corner_radar_rear_left",
-         load_type="capacitive",
-         system_cluster="adas", system_name="surround_sensing")
-    _add("zone_rear", "inf_hs_2a", "corner_radar_rear_right",
-         load_type="capacitive",
-         system_cluster="adas", system_name="surround_sensing")
+    _add(
+        "zone_rear",
+        "inf_hs_2a",
+        "corner_radar_rear_left",
+        load_type="capacitive",
+        system_cluster="adas",
+        system_name="surround_sensing",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_2a",
+        "corner_radar_rear_right",
+        load_type="capacitive",
+        system_cluster="adas",
+        system_name="surround_sensing",
+    )
     # Occupant safety
-    _add("zone_rear", "inf_hs_5a", "belt_pretensioner_left",
-         system_cluster="occupant_safety", system_name="restraint_systems")
-    _add("zone_rear", "inf_hs_5a", "belt_pretensioner_right",
-         system_cluster="occupant_safety", system_name="restraint_systems")
+    _add(
+        "zone_rear",
+        "inf_hs_5a",
+        "belt_pretensioner_left",
+        system_cluster="occupant_safety",
+        system_name="restraint_systems",
+    )
+    _add(
+        "zone_rear",
+        "inf_hs_5a",
+        "belt_pretensioner_right",
+        system_cluster="occupant_safety",
+        system_name="restraint_systems",
+    )
     # Suspension
-    _add("zone_rear", "inf_hs_18a", "active_damper_rear",
-         system_cluster="drivetrain", system_name="active_suspension")
+    _add(
+        "zone_rear",
+        "inf_hs_18a",
+        "active_damper_rear",
+        system_cluster="drivetrain",
+        system_name="active_suspension",
+    )
 
     # ── Body zone (15 channels) ──────────────────────────────────
     # Door modules
-    _add("zone_body", "inf_hs_11a", "door_lock_front_left",
-         load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0,
-         system_cluster="body_comfort", system_name="door_modules",
-         driver_type="h_bridge")
-    _add("zone_body", "inf_hs_11a", "door_lock_front_right",
-         load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0,
-         system_cluster="body_comfort", system_name="door_modules",
-         driver_type="h_bridge")
-    _add("zone_body", "inf_hs_11a", "door_lock_rear_left",
-         load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0,
-         system_cluster="body_comfort", system_name="door_modules",
-         driver_type="h_bridge")
-    _add("zone_body", "inf_hs_11a", "door_lock_rear_right",
-         load_type="motor", inrush_factor=4.0, inrush_duration_ms=40.0,
-         system_cluster="body_comfort", system_name="door_modules",
-         driver_type="h_bridge")
-    _add("zone_body", "inf_hs_28a", "pdu_main_feed",
-         system_cluster="power_distribution", system_name="body_power",
-         safety_level="asil_b")
-    _add("zone_body", "inf_hs_14a", "keyless_entry_module",
-         system_cluster="body_comfort", system_name="keyless_access")
-    _add("zone_body", "inf_hs_14a", "immobilizer_relay",
-         system_cluster="body_comfort", system_name="keyless_access")
+    _add(
+        "zone_body",
+        "inf_hs_11a",
+        "door_lock_front_left",
+        load_type="motor",
+        inrush_factor=4.0,
+        inrush_duration_ms=40.0,
+        system_cluster="body_comfort",
+        system_name="door_modules",
+        driver_type="h_bridge",
+    )
+    _add(
+        "zone_body",
+        "inf_hs_11a",
+        "door_lock_front_right",
+        load_type="motor",
+        inrush_factor=4.0,
+        inrush_duration_ms=40.0,
+        system_cluster="body_comfort",
+        system_name="door_modules",
+        driver_type="h_bridge",
+    )
+    _add(
+        "zone_body",
+        "inf_hs_11a",
+        "door_lock_rear_left",
+        load_type="motor",
+        inrush_factor=4.0,
+        inrush_duration_ms=40.0,
+        system_cluster="body_comfort",
+        system_name="door_modules",
+        driver_type="h_bridge",
+    )
+    _add(
+        "zone_body",
+        "inf_hs_11a",
+        "door_lock_rear_right",
+        load_type="motor",
+        inrush_factor=4.0,
+        inrush_duration_ms=40.0,
+        system_cluster="body_comfort",
+        system_name="door_modules",
+        driver_type="h_bridge",
+    )
+    _add(
+        "zone_body",
+        "inf_hs_28a",
+        "pdu_main_feed",
+        system_cluster="power_distribution",
+        system_name="body_power",
+        safety_level="asil_b",
+    )
+    _add(
+        "zone_body",
+        "inf_hs_14a",
+        "keyless_entry_module",
+        system_cluster="body_comfort",
+        system_name="keyless_access",
+    )
+    _add(
+        "zone_body",
+        "inf_hs_14a",
+        "immobilizer_relay",
+        system_cluster="body_comfort",
+        system_name="keyless_access",
+    )
     # Infrastructure power
-    _add("zone_body", "inf_hs_100a", "power_supply_body_safety",
-         system_cluster="power_distribution", system_name="infrastructure_power",
-         safety_level="asil_b", power_class="always_on")
-    _add("zone_body", "inf_hs_100a", "power_supply_body_comfort",
-         system_cluster="power_distribution", system_name="infrastructure_power",
-         power_class="always_on")
+    _add(
+        "zone_body",
+        "inf_hs_100a",
+        "power_supply_body_safety",
+        system_cluster="power_distribution",
+        system_name="infrastructure_power",
+        safety_level="asil_b",
+        power_class="always_on",
+    )
+    _add(
+        "zone_body",
+        "inf_hs_100a",
+        "power_supply_body_comfort",
+        system_cluster="power_distribution",
+        system_name="infrastructure_power",
+        power_class="always_on",
+    )
     # Cabin climate
-    _add("zone_body", "inf_hs_9a", "hvac_blend_door",
-         system_cluster="body_comfort", system_name="cabin_climate")
-    _add("zone_body", "inf_hs_18a", "ptc_cabin_heater",
-         load_type="ptc", pwm_capable=True,
-         system_cluster="body_comfort", system_name="cabin_climate")
-    _add("zone_body", "inf_hs_2a", "cabin_air_quality_sensor",
-         system_cluster="body_comfort", system_name="cabin_climate")
+    _add(
+        "zone_body",
+        "inf_hs_9a",
+        "hvac_blend_door",
+        system_cluster="body_comfort",
+        system_name="cabin_climate",
+    )
+    _add(
+        "zone_body",
+        "inf_hs_18a",
+        "ptc_cabin_heater",
+        load_type="ptc",
+        pwm_capable=True,
+        system_cluster="body_comfort",
+        system_name="cabin_climate",
+    )
+    _add(
+        "zone_body",
+        "inf_hs_2a",
+        "cabin_air_quality_sensor",
+        system_cluster="body_comfort",
+        system_name="cabin_climate",
+    )
     # Body electronics
-    _add("zone_body", "inf_hs_5a", "steering_column_heater",
-         load_type="ptc", pwm_capable=True,
-         system_cluster="body_comfort", system_name="heated_surfaces")
-    _add("zone_body", "inf_hs_5a", "rear_climate_panel",
-         system_cluster="body_comfort", system_name="cabin_climate")
-    _add("zone_body", "inf_hs_2a", "cooled_storage_compartment",
-         system_cluster="body_comfort", system_name="convenience_features")
+    _add(
+        "zone_body",
+        "inf_hs_5a",
+        "steering_column_heater",
+        load_type="ptc",
+        pwm_capable=True,
+        system_cluster="body_comfort",
+        system_name="heated_surfaces",
+    )
+    _add(
+        "zone_body",
+        "inf_hs_5a",
+        "rear_climate_panel",
+        system_cluster="body_comfort",
+        system_name="cabin_climate",
+    )
+    _add(
+        "zone_body",
+        "inf_hs_2a",
+        "cooled_storage_compartment",
+        system_cluster="body_comfort",
+        system_name="convenience_features",
+    )
 
     # ── Front zone (15 channels) ─────────────────────────────────
     # Infrastructure power
-    _add("zone_front", "inf_hs_100a", "power_supply_front_safety",
-         system_cluster="power_distribution", system_name="infrastructure_power",
-         safety_level="asil_b", power_class="always_on")
-    _add("zone_front", "inf_hs_100a", "power_supply_front_aux",
-         system_cluster="power_distribution", system_name="infrastructure_power",
-         power_class="always_on")
+    _add(
+        "zone_front",
+        "inf_hs_100a",
+        "power_supply_front_safety",
+        system_cluster="power_distribution",
+        system_name="infrastructure_power",
+        safety_level="asil_b",
+        power_class="always_on",
+    )
+    _add(
+        "zone_front",
+        "inf_hs_100a",
+        "power_supply_front_aux",
+        system_cluster="power_distribution",
+        system_name="infrastructure_power",
+        power_class="always_on",
+    )
     # HVAC
-    _add("zone_front", "inf_hs_18a", "coolant_heater",
-         load_type="ptc", pwm_capable=True,
-         system_cluster="body_comfort", system_name="cabin_climate")
-    _add("zone_front", "st_hs_50a", "ac_compressor",
-         load_type="motor", inrush_factor=5.0, inrush_duration_ms=80.0,
-         system_cluster="body_comfort", system_name="cabin_climate",
-         pwm_capable=True)
-    _add("zone_front", "inf_hs_14a", "blower_motor",
-         load_type="motor", inrush_factor=4.0, inrush_duration_ms=60.0,
-         system_cluster="body_comfort", system_name="cabin_climate",
-         pwm_capable=True)
+    _add(
+        "zone_front",
+        "inf_hs_18a",
+        "coolant_heater",
+        load_type="ptc",
+        pwm_capable=True,
+        system_cluster="body_comfort",
+        system_name="cabin_climate",
+    )
+    _add(
+        "zone_front",
+        "st_hs_50a",
+        "ac_compressor",
+        load_type="motor",
+        inrush_factor=5.0,
+        inrush_duration_ms=80.0,
+        system_cluster="body_comfort",
+        system_name="cabin_climate",
+        pwm_capable=True,
+    )
+    _add(
+        "zone_front",
+        "inf_hs_14a",
+        "blower_motor",
+        load_type="motor",
+        inrush_factor=4.0,
+        inrush_duration_ms=60.0,
+        system_cluster="body_comfort",
+        system_name="cabin_climate",
+        pwm_capable=True,
+    )
     # Suspension / chassis
-    _add("zone_front", "inf_hs_18a", "active_damper_front",
-         system_cluster="drivetrain", system_name="active_suspension")
-    _add("zone_front", "inf_hs_14a", "supercap_suspension",
-         load_type="capacitive",
-         system_cluster="drivetrain", system_name="active_suspension")
+    _add(
+        "zone_front",
+        "inf_hs_18a",
+        "active_damper_front",
+        system_cluster="drivetrain",
+        system_name="active_suspension",
+    )
+    _add(
+        "zone_front",
+        "inf_hs_14a",
+        "supercap_suspension",
+        load_type="capacitive",
+        system_cluster="drivetrain",
+        system_name="active_suspension",
+    )
     # Seat comfort (front)
-    _add("zone_front", "st_dual_14a", "massage_seat_left",
-         system_cluster="body_comfort", system_name="seat_comfort")
-    _add("zone_front", "st_dual_14a", "massage_seat_right",
-         system_cluster="body_comfort", system_name="seat_comfort")
+    _add(
+        "zone_front",
+        "st_dual_14a",
+        "massage_seat_left",
+        system_cluster="body_comfort",
+        system_name="seat_comfort",
+    )
+    _add(
+        "zone_front",
+        "st_dual_14a",
+        "massage_seat_right",
+        system_cluster="body_comfort",
+        system_name="seat_comfort",
+    )
     # Auxiliary loads / reserves
-    _add("zone_front", "inf_hs_5a", "aux_load_1",
-         system_cluster="auxiliary", system_name="auxiliary_loads")
-    _add("zone_front", "inf_hs_5a", "aux_load_2",
-         system_cluster="auxiliary", system_name="auxiliary_loads")
-    _add("zone_front", "inf_hs_5a", "aux_load_3",
-         system_cluster="auxiliary", system_name="auxiliary_loads")
+    _add(
+        "zone_front",
+        "inf_hs_5a",
+        "aux_load_1",
+        system_cluster="auxiliary",
+        system_name="auxiliary_loads",
+    )
+    _add(
+        "zone_front",
+        "inf_hs_5a",
+        "aux_load_2",
+        system_cluster="auxiliary",
+        system_name="auxiliary_loads",
+    )
+    _add(
+        "zone_front",
+        "inf_hs_5a",
+        "aux_load_3",
+        system_cluster="auxiliary",
+        system_name="auxiliary_loads",
+    )
     # Body / access
-    _add("zone_front", "inf_hs_14a", "pdu_cross_feed",
-         system_cluster="power_distribution", system_name="body_power")
-    _add("zone_front", "inf_hs_5a", "tire_pressure_module",
-         load_type="capacitive",
-         system_cluster="adas", system_name="tire_monitoring")
-    _add("zone_front", "inf_hs_2a", "reserve_channel",
-         system_cluster="auxiliary", system_name="auxiliary_loads")
+    _add(
+        "zone_front",
+        "inf_hs_14a",
+        "pdu_cross_feed",
+        system_cluster="power_distribution",
+        system_name="body_power",
+    )
+    _add(
+        "zone_front",
+        "inf_hs_5a",
+        "tire_pressure_module",
+        load_type="capacitive",
+        system_cluster="adas",
+        system_name="tire_monitoring",
+    )
+    _add(
+        "zone_front",
+        "inf_hs_2a",
+        "reserve_channel",
+        system_cluster="auxiliary",
+        system_name="auxiliary_loads",
+    )
 
     # ── Central zone (10 channels) ───────────────────────────────
     # Sensors / misc
-    _add("zone_central", "inf_hs_2a", "climate_sensor_module",
-         load_type="capacitive",
-         system_cluster="body_comfort", system_name="sensor_modules")
-    _add("zone_central", "st_hb_30a", "tailgate_actuator",
-         load_type="motor", inrush_factor=5.0, inrush_duration_ms=60.0,
-         system_cluster="body_comfort", system_name="closure_actuators",
-         driver_type="h_bridge")
-    _add("zone_central", "inf_hs_2a", "interior_reading_light",
-         pwm_capable=True,
-         system_cluster="interior_lighting", system_name="cabin_lights")
+    _add(
+        "zone_central",
+        "inf_hs_2a",
+        "climate_sensor_module",
+        load_type="capacitive",
+        system_cluster="body_comfort",
+        system_name="sensor_modules",
+    )
+    _add(
+        "zone_central",
+        "st_hb_30a",
+        "tailgate_actuator",
+        load_type="motor",
+        inrush_factor=5.0,
+        inrush_duration_ms=60.0,
+        system_cluster="body_comfort",
+        system_name="closure_actuators",
+        driver_type="h_bridge",
+    )
+    _add(
+        "zone_central",
+        "inf_hs_2a",
+        "interior_reading_light",
+        pwm_capable=True,
+        system_cluster="interior_lighting",
+        system_name="cabin_lights",
+    )
     # Power distribution
-    _add("zone_central", "inf_hs_100a", "main_bus_safety",
-         system_cluster="power_distribution", system_name="main_bus",
-         safety_level="asil_b", power_class="always_on")
-    _add("zone_central", "inf_hs_100a", "main_bus_aux",
-         system_cluster="power_distribution", system_name="main_bus",
-         power_class="always_on")
+    _add(
+        "zone_central",
+        "inf_hs_100a",
+        "main_bus_safety",
+        system_cluster="power_distribution",
+        system_name="main_bus",
+        safety_level="asil_b",
+        power_class="always_on",
+    )
+    _add(
+        "zone_central",
+        "inf_hs_100a",
+        "main_bus_aux",
+        system_cluster="power_distribution",
+        system_name="main_bus",
+        power_class="always_on",
+    )
     # Infrastructure feeds
-    _add("zone_central", "inf_hs_100a", "power_supply_central_safety",
-         system_cluster="power_distribution", system_name="infrastructure_power",
-         safety_level="asil_b", power_class="always_on")
-    _add("zone_central", "inf_hs_100a", "power_supply_central_aux",
-         system_cluster="power_distribution", system_name="infrastructure_power",
-         power_class="always_on")
+    _add(
+        "zone_central",
+        "inf_hs_100a",
+        "power_supply_central_safety",
+        system_cluster="power_distribution",
+        system_name="infrastructure_power",
+        safety_level="asil_b",
+        power_class="always_on",
+    )
+    _add(
+        "zone_central",
+        "inf_hs_100a",
+        "power_supply_central_aux",
+        system_cluster="power_distribution",
+        system_name="infrastructure_power",
+        power_class="always_on",
+    )
     # Reserves
-    _add("zone_central", "inf_hs_5a", "reserve_1",
-         system_cluster="auxiliary", system_name="auxiliary_loads")
-    _add("zone_central", "inf_hs_5a", "reserve_2",
-         system_cluster="auxiliary", system_name="auxiliary_loads")
-    _add("zone_central", "inf_hs_5a", "reserve_3",
-         system_cluster="auxiliary", system_name="auxiliary_loads")
+    _add(
+        "zone_central",
+        "inf_hs_5a",
+        "reserve_1",
+        system_cluster="auxiliary",
+        system_name="auxiliary_loads",
+    )
+    _add(
+        "zone_central",
+        "inf_hs_5a",
+        "reserve_2",
+        system_cluster="auxiliary",
+        system_name="auxiliary_loads",
+    )
+    _add(
+        "zone_central",
+        "inf_hs_5a",
+        "reserve_3",
+        system_cluster="auxiliary",
+        system_name="auxiliary_loads",
+    )
 
     assert _ch == 65, f"Expected 65 channels, got {_ch}"
     return zones, specs

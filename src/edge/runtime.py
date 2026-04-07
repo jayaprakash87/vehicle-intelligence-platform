@@ -475,8 +475,7 @@ class EdgeRuntime:
                     if self._lifetime_tracker is not None:
                         self._lifetime_tracker.ingest(s)
                 self.cycle_summaries.extend(
-                    s2 for s2 in self._cycle_accumulator.completed
-                    if s2 not in self.cycle_summaries
+                    s2 for s2 in self._cycle_accumulator.completed if s2 not in self.cycle_summaries
                 )
             if self.writer and self._alerts:
                 self.writer.write_alerts(self._alerts)

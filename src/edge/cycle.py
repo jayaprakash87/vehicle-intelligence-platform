@@ -296,10 +296,7 @@ class CycleAccumulator:
 
         # Weighted sum (tunable later)
         stress = (
-            0.35 * anomaly_rate
-            + 0.25 * trip_burden
-            + 0.15 * retry_burden
-            + 0.25 * thermal_burden
+            0.35 * anomaly_rate + 0.25 * trip_burden + 0.15 * retry_burden + 0.25 * thermal_burden
         )
         return min(stress, 1.0)
 

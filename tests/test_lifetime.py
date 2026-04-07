@@ -240,9 +240,16 @@ class TestLifetimeHealthTrackerBasic:
         tracker.reset()
         for i in range(20):
             s2 = tracker.ingest(
-                _make_summary(i, stress=0.95, peak_current=50.0, peak_temp=180.0,
-                              trip_count=30, retry_count=30,
-                              high_temp_dwell=58.0, duration=60.0)
+                _make_summary(
+                    i,
+                    stress=0.95,
+                    peak_current=50.0,
+                    peak_temp=180.0,
+                    trip_count=30,
+                    retry_count=30,
+                    high_temp_dwell=58.0,
+                    duration=60.0,
+                )
             )
         assert 0.0 <= s2.health_score <= 1.0
 
@@ -281,9 +288,16 @@ class TestLifetimeHistogramDistribution:
         tracker = LifetimeHealthTracker()
         for i in range(20):
             tracker.ingest(
-                _make_summary(i, peak_current=50.0, peak_temp=200.0,
-                              stress=0.95, trip_count=30, retry_count=30,
-                              high_temp_dwell=58.0, duration=60.0)
+                _make_summary(
+                    i,
+                    peak_current=50.0,
+                    peak_temp=200.0,
+                    stress=0.95,
+                    trip_count=30,
+                    retry_count=30,
+                    high_temp_dwell=58.0,
+                    duration=60.0,
+                )
             )
         state = tracker.state
         assert state.health_band == HealthBand.CRITICAL
@@ -305,9 +319,16 @@ class TestLifetimeHealthTrackerTrend:
         # Then severe
         for i in range(3, 8):
             state = tracker.ingest(
-                _make_summary(i, stress=0.9, peak_current=35.0, peak_temp=170.0,
-                              trip_count=25, retry_count=25,
-                              high_temp_dwell=55.0, duration=60.0)
+                _make_summary(
+                    i,
+                    stress=0.9,
+                    peak_current=35.0,
+                    peak_temp=170.0,
+                    trip_count=25,
+                    retry_count=25,
+                    high_temp_dwell=55.0,
+                    duration=60.0,
+                )
             )
         assert state.trend in (TrendDirection.DEGRADING, TrendDirection.WORSENING)
 

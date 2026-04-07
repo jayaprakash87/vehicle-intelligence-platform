@@ -35,7 +35,7 @@ State transitions::
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 from src.schemas.telemetry import FaultType
@@ -44,10 +44,10 @@ from src.schemas.telemetry import FaultType
 class DTCStatus(str, Enum):
     """DTC status aligned to AUTOSAR Dem DTC status bits (simplified)."""
 
-    ABSENT = "absent"      # No fault observed or fault healed
-    PENDING = "pending"    # Fault observed but not yet confirmed
+    ABSENT = "absent"  # No fault observed or fault healed
+    PENDING = "pending"  # Fault observed but not yet confirmed
     CONFIRMED = "confirmed"  # Fault confirmed — DTC asserted, alert may be emitted
-    HEALING = "healing"    # Previously confirmed, now passing but not yet cleared
+    HEALING = "healing"  # Previously confirmed, now passing but not yet cleared
 
 
 @dataclass
@@ -55,8 +55,8 @@ class _DTCRecord:
     """Internal state for one (channel_id, fault_type) pair."""
 
     status: DTCStatus = DTCStatus.ABSENT
-    fail_count: int = 0   # consecutive failing evals
-    heal_count: int = 0   # consecutive passing evals while CONFIRMED
+    fail_count: int = 0  # consecutive failing evals
+    heal_count: int = 0  # consecutive passing evals while CONFIRMED
 
 
 class DTCDebouncer:

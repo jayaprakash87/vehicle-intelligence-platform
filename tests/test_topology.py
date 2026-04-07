@@ -86,7 +86,9 @@ class TestEFuseCatalog:
 
     def test_known_manufacturers(self):
         manufacturers = {p.manufacturer for p in EFUSE_CATALOG.values()}
-        assert manufacturers <= {"Infineon", "STMicroelectronics", "custom"}, f"Unexpected: {manufacturers}"
+        assert manufacturers <= {"Infineon", "STMicroelectronics", "custom"}, (
+            f"Unexpected: {manufacturers}"
+        )
 
     def test_h_bridge_ic_in_catalog(self):
         """VNH9045AQTR should be referenced for the ST_HB_30A family."""
@@ -144,7 +146,12 @@ class TestBuildChannels:
         """Channel should inherit source_protocol from its zone controller."""
         zones = [ZoneController(zone_id="z1", name="XCP Zone", bus_interface=SourceProtocol.XCP)]
         specs = [
-            {"channel_id": "ch_test", "zone_id": "z1", "efuse_family": "inf_hs_5a", "load_name": "test"}
+            {
+                "channel_id": "ch_test",
+                "zone_id": "z1",
+                "efuse_family": "inf_hs_5a",
+                "load_name": "test",
+            }
         ]
         channels = build_channels(zones, specs)
         assert channels[0].source_protocol == SourceProtocol.XCP
@@ -379,7 +386,9 @@ class TestIOAttributes:
 
     def test_always_on_channels(self, topo_channels):
         """Safety-critical feeds should be always_on (KL30)."""
-        always_on_names = {ch.load_name for ch in topo_channels if ch.power_class == PowerClass.ALWAYS_ON}
+        always_on_names = {
+            ch.load_name for ch in topo_channels if ch.power_class == PowerClass.ALWAYS_ON
+        }
         assert "tail_light_left" in always_on_names
         assert "main_bus_safety" in always_on_names
         assert "power_supply_body_safety" in always_on_names

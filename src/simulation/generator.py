@@ -589,16 +589,18 @@ class TelemetryGenerator:
                 if prev_state is not None and not (
                     (ch.power_class == PowerClass.ALWAYS_ON)
                     or (ch.power_class == PowerClass.IGNITION and prev_state == PowerState.ACTIVE)
-                    or (ch.power_class == PowerClass.ACCESSORY and prev_state in (PowerState.ACTIVE, PowerState.ACCESSORY))
+                    or (
+                        ch.power_class == PowerClass.ACCESSORY
+                        and prev_state in (PowerState.ACTIVE, PowerState.ACCESSORY)
+                    )
                     or (ch.power_class == PowerClass.START and prev_state == PowerState.CRANK)
                 ):
                     # Came from an unpowered state — inject wake inrush window
                     inrush_samples = max(int(ch.wake_inrush_duration_ms / 1000 / interval_s), 1)
                     end_inrush = min(i + inrush_samples, n)
                     t_ramp = np.linspace(ch.wake_inrush_factor, 1.0, end_inrush - i)
-                    current[i:end_inrush] = (
-                        ch.nominal_current_a * t_ramp
-                        + self._composite_noise(end_inrush - i, ch)
+                    current[i:end_inrush] = ch.nominal_current_a * t_ramp + self._composite_noise(
+                        end_inrush - i, ch
                     )
 
             prev_state = ps
@@ -702,14 +704,18 @@ class TelemetryGenerator:
                     t_norm = np.linspace(0, 1, n_fault)
                     # Exponential-squared aging curve — slow start, accelerating
                     k_age = fi.intensity * 20.0
-                    r_connector_aged = ch.connector_r_ohm * (1.0 + k_age * t_norm ** 2)
+                    r_connector_aged = ch.connector_r_ohm * (1.0 + k_age * t_norm**2)
                     r_total = ch.harness_r_ohm + r_connector_aged  # Ω
                     # Voltage at load falls with aging R (current stays roughly constant — eFuse
                     # doesn't adjust; the load sees reduced voltage)
-                    voltage[sl] = bus_voltage[sl] - current[sl] * r_total + self.rng.normal(0, 0.01, n_fault)
+                    voltage[sl] = (
+                        bus_voltage[sl] - current[sl] * r_total + self.rng.normal(0, 0.01, n_fault)
+                    )
                     # For resistive loads: I = V_load / R_load — voltage drop reduces current slightly
                     # Model this as a correction proportional to relative voltage reduction
-                    v_nominal_load = bus_voltage[sl] - current[sl] * (ch.harness_r_ohm + ch.connector_r_ohm)
+                    v_nominal_load = bus_voltage[sl] - current[sl] * (
+                        ch.harness_r_ohm + ch.connector_r_ohm
+                    )
                     v_aged_load = voltage[sl]
                     # Avoid division by zero; correction only where v_nominal_load > 0
                     with np.errstate(invalid="ignore", divide="ignore"):
@@ -728,7 +734,6 @@ class TelemetryGenerator:
                     # distinguish open-load from a very low-current load without DIAGNOSIS.
                     # After ol_blank_time_ms, the IC's DIAGNOSIS cycle confirms open load
                     # and sets the OPEN_LOAD_DIAG status bit in the SPI register.
-                    ol_threshold = ch.ol_threshold_a if ch.ol_threshold_a > 0 else ch.nominal_current_a * 0.03
                     current[sl] = self.rng.normal(0.0005, 0.0002, n_fault)
                     # State stays ON (gate commanded) — IC cannot self-detect without DIAGNOSIS
                     state[sl] = True
@@ -756,10 +761,14 @@ class TelemetryGenerator:
                     voltage[sl] = bus_voltage[sl] + self.rng.normal(0, 0.05, n_fault)
                     # Resistive load current scales with voltage ratio
                     v_ratio = bus_voltage[sl] / 13.5
-                    current[sl] = ch.nominal_current_a * v_ratio + self._composite_noise(n_fault, ch)
+                    current[sl] = ch.nominal_current_a * v_ratio + self._composite_noise(
+                        n_fault, ch
+                    )
                     # IC reports over-voltage event once bus exceeds 16 V
                     ov_mask = bus_voltage[sl] > 16.0
-                    protection_event[start_idx:end_idx][ov_mask] = ProtectionEvent.OVER_VOLTAGE.value
+                    protection_event[start_idx:end_idx][ov_mask] = (
+                        ProtectionEvent.OVER_VOLTAGE.value
+                    )
                     status[sl] = DeviceStatus.WARNING.value
 
                 case FaultType.LOAD_DUMP:
@@ -782,7 +791,7 @@ class TelemetryGenerator:
                         0.001, 0.0005, n_fault - peak_samples
                     )  # IC off during clamp
                     state[start_idx + peak_samples : end_idx] = False
-                    trip[start_idx : end_idx] = True
+                    trip[start_idx:end_idx] = True
                     protection_event[start_idx:end_idx] = ProtectionEvent.OVER_VOLTAGE.value
                     status[sl] = DeviceStatus.FAULT.value
 
@@ -805,7 +814,9 @@ class TelemetryGenerator:
                     voltage[sl] = bus_voltage[sl] + self.rng.normal(0, 0.08, n_fault)
                     # Resistive loads see reduced current proportional to voltage sag
                     v_ratio_crank = np.clip(bus_voltage[sl] / 13.5, 0.3, 1.2)
-                    current[sl] = ch.nominal_current_a * v_ratio_crank + self._composite_noise(n_fault, ch)
+                    current[sl] = ch.nominal_current_a * v_ratio_crank + self._composite_noise(
+                        n_fault, ch
+                    )
                     # Under-voltage warning when bus < 9 V
                     uv_mask = bus_voltage[sl] < 9.0
                     status[start_idx:end_idx] = np.where(

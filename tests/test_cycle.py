@@ -73,9 +73,7 @@ def _boundary_df(
     off_part = _scored_df(off_rows, state_on=False, seed=seed + 1)
     # Shift off timestamps to follow on
     off_start = on_part["timestamp"].iloc[-1] + timedelta(milliseconds=100)
-    off_part["timestamp"] = [
-        off_start + timedelta(milliseconds=i * 100) for i in range(off_rows)
-    ]
+    off_part["timestamp"] = [off_start + timedelta(milliseconds=i * 100) for i in range(off_rows)]
     return pd.concat([on_part, off_part], ignore_index=True)
 
 
@@ -299,9 +297,7 @@ class TestEdgeRuntimeCycleIntegration:
         rng = np.random.default_rng(seed)
         return pd.DataFrame(
             {
-                "timestamp": [
-                    T0 + timedelta(milliseconds=i * 100) for i in range(n)
-                ],
+                "timestamp": [T0 + timedelta(milliseconds=i * 100) for i in range(n)],
                 "channel_id": "ch_01",
                 "current_a": rng.normal(5.0, 0.1, n),
                 "voltage_v": 13.5,

@@ -52,14 +52,22 @@ def _row(**overrides) -> dict:
         ({"missing_rate": 0.25}, FaultType.DROPPED_PACKET),
         # 8. Jump start — bus elevated above 16 V
         (
-            {"rolling_max_voltage": 18.0, "voltage_v": 18.0,
-             "over_voltage_count": 2, "protection_event": ProtectionEvent.OVER_VOLTAGE.value},
+            {
+                "rolling_max_voltage": 18.0,
+                "voltage_v": 18.0,
+                "over_voltage_count": 2,
+                "protection_event": ProtectionEvent.OVER_VOLTAGE.value,
+            },
             FaultType.JUMP_START,
         ),
         # 9. Load dump — bus spike above 30 V
         (
-            {"rolling_max_voltage": 35.0, "voltage_v": 35.0,
-             "over_voltage_count": 4, "protection_event": ProtectionEvent.OVER_VOLTAGE.value},
+            {
+                "rolling_max_voltage": 35.0,
+                "voltage_v": 35.0,
+                "over_voltage_count": 4,
+                "protection_event": ProtectionEvent.OVER_VOLTAGE.value,
+            },
             FaultType.LOAD_DUMP,
         ),
         # 10. Cold crank — bus sag below 9 V
@@ -158,7 +166,7 @@ def test_dtc_pending_before_confirmed():
 def test_dtc_transient_never_confirms():
     """A single failing eval followed by a pass should silently reset to ABSENT."""
     dtc = DTCDebouncer(fail_threshold=3, heal_threshold=5)
-    dtc.update("ch_01", FaultType.VOLTAGE_SAG, True)   # PENDING fail_count=1
+    dtc.update("ch_01", FaultType.VOLTAGE_SAG, True)  # PENDING fail_count=1
     s = dtc.update("ch_01", FaultType.VOLTAGE_SAG, False)  # pass → ABSENT
     assert s == DTCStatus.ABSENT
     assert not dtc.is_confirmed("ch_01", FaultType.VOLTAGE_SAG)

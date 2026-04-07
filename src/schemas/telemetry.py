@@ -123,6 +123,7 @@ class EFuseFamily(str, Enum):
     # Custom / ASIC — user-defined eFuse with user-provided parameters
     CUSTOM = "custom"
 
+
 class PowerState(str, Enum):
     """Vehicle power state — determines which power rails are energised.
 
@@ -133,10 +134,10 @@ class PowerState(str, Enum):
       CRANK    KL30 + KL50 live — starter motor engaged, KL15 may dip
     """
 
-    SLEEP = "sleep"        # KL30 only — most channels OFF
-    ACTIVE = "active"      # KL15 on  — normal run
+    SLEEP = "sleep"  # KL30 only — most channels OFF
+    ACTIVE = "active"  # KL15 on  — normal run
     ACCESSORY = "accessory"  # KLR on   — post key-off accessory rail
-    CRANK = "crank"        # KL50 on  — engine cranking
+    CRANK = "crank"  # KL50 on  — engine cranking
 
 
 class SafetyLevel(str, Enum):
@@ -754,37 +755,43 @@ class LifetimeHealthState(BaseModel):
     # --- Load-spectrum histograms (primary state) ---
     peak_current_hist: LoadHistogram = Field(
         default_factory=lambda: LoadHistogram(
-            name="peak_current_a", unit="A",
+            name="peak_current_a",
+            unit="A",
             edges=[2.0, 5.0, 8.0, 12.0, 15.0, 20.0, 30.0],
         )
     )
     peak_temperature_hist: LoadHistogram = Field(
         default_factory=lambda: LoadHistogram(
-            name="peak_temperature_c", unit="°C",
+            name="peak_temperature_c",
+            unit="°C",
             edges=[40.0, 60.0, 80.0, 100.0, 120.0, 140.0, 160.0],
         )
     )
     cycle_stress_hist: LoadHistogram = Field(
         default_factory=lambda: LoadHistogram(
-            name="cycle_stress", unit="ratio",
+            name="cycle_stress",
+            unit="ratio",
             edges=[0.05, 0.10, 0.15, 0.25, 0.40, 0.60, 0.80],
         )
     )
     trips_per_cycle_hist: LoadHistogram = Field(
         default_factory=lambda: LoadHistogram(
-            name="trips_per_cycle", unit="count",
+            name="trips_per_cycle",
+            unit="count",
             edges=[1.0, 2.0, 3.0, 5.0, 8.0, 12.0, 20.0],
         )
     )
     retries_per_cycle_hist: LoadHistogram = Field(
         default_factory=lambda: LoadHistogram(
-            name="retries_per_cycle", unit="count",
+            name="retries_per_cycle",
+            unit="count",
             edges=[1.0, 2.0, 3.0, 5.0, 8.0, 12.0, 20.0],
         )
     )
     thermal_dwell_frac_hist: LoadHistogram = Field(
         default_factory=lambda: LoadHistogram(
-            name="thermal_dwell_fraction", unit="ratio",
+            name="thermal_dwell_fraction",
+            unit="ratio",
             edges=[0.01, 0.05, 0.10, 0.20, 0.35, 0.50, 0.75],
         )
     )

@@ -237,6 +237,7 @@ labels: pd.DataFrame = st.session_state["labels"]
 def _compute_cycle_lifetime(scored_json: str) -> tuple[list[dict], dict | None]:
     """Run cycle accumulation and lifetime tracking on scored data."""
     import io
+
     _scored = pd.read_json(io.StringIO(scored_json), orient="split")
     acc = CycleAccumulator(cycle_type="ignition")
     summaries = acc.ingest(_scored)
@@ -306,8 +307,18 @@ view = scored[scored["channel_id"].isin(selected_channels)].copy()
 # Tab layout
 # ---------------------------------------------------------------------------
 
-tab_signals, tab_anomaly, tab_faults, tab_protection, tab_cycles, tab_lifetime, tab_summary = st.tabs(
-    ["📈 Signals", "🔍 Anomalies", "⚠️ Faults", "🛡️ Protection Events", "🔄 Cycle Health", "📉 Lifetime Health", "📊 Summary"]
+tab_signals, tab_anomaly, tab_faults, tab_protection, tab_cycles, tab_lifetime, tab_summary = (
+    st.tabs(
+        [
+            "📈 Signals",
+            "🔍 Anomalies",
+            "⚠️ Faults",
+            "🛡️ Protection Events",
+            "🔄 Cycle Health",
+            "📉 Lifetime Health",
+            "📊 Summary",
+        ]
+    )
 )
 
 # ---- Signals tab ----
@@ -513,7 +524,12 @@ with tab_cycles:
         band_counts = cycle_df["health_band"].value_counts().reset_index()
         band_counts.columns = ["band", "count"]
         band_order = [b.value for b in HealthBand]
-        band_colors = {"nominal": "#2ecc71", "monitor": "#f39c12", "degraded": "#e67e22", "critical": "#e74c3c"}
+        band_colors = {
+            "nominal": "#2ecc71",
+            "monitor": "#f39c12",
+            "degraded": "#e67e22",
+            "critical": "#e74c3c",
+        }
         fig_bands = px.bar(
             band_counts,
             x="band",
@@ -542,15 +558,25 @@ with tab_cycles:
 
         # Cycle detail table
         display_cols = [
-            "cycle_id", "cycle_type", "duration_s", "sample_count",
-            "anomaly_count", "trip_count", "retry_count",
-            "peak_current_a", "peak_temperature_c",
-            "cycle_stress", "health_band", "dominant_fault",
+            "cycle_id",
+            "cycle_type",
+            "duration_s",
+            "sample_count",
+            "anomaly_count",
+            "trip_count",
+            "retry_count",
+            "peak_current_a",
+            "peak_temperature_c",
+            "cycle_stress",
+            "health_band",
+            "dominant_fault",
         ]
         available = [c for c in display_cols if c in cycle_df.columns]
         st.dataframe(cycle_df[available], use_container_width=True)
     else:
-        st.info("No cycle boundaries detected. Cycle tracking requires `state_on_off` transitions in the data.")
+        st.info(
+            "No cycle boundaries detected. Cycle tracking requires `state_on_off` transitions in the data."
+        )
 
 # ---- Lifetime Health tab ----
 with tab_lifetime:
@@ -591,7 +617,7 @@ with tab_lifetime:
                     if k == 0:
                         labels.append(f"< {edges[0]}")
                     elif k < len(edges):
-                        labels.append(f"{edges[k-1]}–{edges[k]}")
+                        labels.append(f"{edges[k - 1]}–{edges[k]}")
                     else:
                         labels.append(f"≥ {edges[-1]}")
 

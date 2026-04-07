@@ -195,7 +195,9 @@ class RulesFaultClassifier:
                     "Bus voltage spike detected — ISO 16750-2 load dump (alternator field collapse)"
                 )
                 return FaultType.LOAD_DUMP, min(0.7 + ov_count * 0.05, 1.0), causes
-            causes.append("Bus voltage elevated above 16 V — external jump-start or booster connected")
+            causes.append(
+                "Bus voltage elevated above 16 V — external jump-start or booster connected"
+            )
             return FaultType.JUMP_START, min(0.65 + ov_count * 0.05, 1.0), causes
 
         # --- Cold crank under-voltage ---
